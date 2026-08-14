@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fox Games">
+<meta name="theme-color" content="#1F2430">
+<title>Fox Games</title>
+<style>
+  :root{
+    --bg:#1F2430;
+    --panel:#2A3040;
+    --panel-hi:#333A4D;
+    --ink:#EDEEF2;
+    --ink-soft:#8B93A7;
+    --accent:#E2793D;
+    --accent-soft:#3A2E22;
+    --good:#5FAE7E;
+    --rule:rgba(237,238,242,0.08);
+    --board-light:#F2F2F0;
+    --board-dark:#2B2B2E;
+    --piece-dark:#1A1A1C;
+    --piece-light:#D9D9D6;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    min-height:100vh;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  }
+  #app{ max-width:460px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; }
+  .page{ flex:1; padding:26px 20px 100px; display:none; }
+  .page.active{ display:block; }
+
+  .eyebrow{ font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--ink-soft); font-weight:700; margin:0 0 4px 2px; }
+  h1{ font-size:26px; font-weight:800; letter-spacing:-0.01em; margin:0 0 22px 2px; }
+
+  /* ---- favorites grid ---- */
+  .game-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:18px; }
+  .game-tile{ display:flex; flex-direction:column; align-items:center; gap:8px; border:none; background:none; cursor:pointer; }
+  .tile-icon{
+    width:100%; aspect-ratio:1; border-radius:20px;
+    background:linear-gradient(160deg, var(--accent), #B85A24);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 14px -6px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15);
+  }
+  .tile-icon svg{ width:58%; height:58%; }
+  .tile-label{ font-size:12px; font-weight:700; color:var(--ink); }
+
+  /* ---- bottom tab bar ---- */
+  .tab-bar{
+    position:fixed; left:0; right:0; bottom:0;
+    display:flex;
+    background:var(--panel);
+    border-top:1px solid var(--rule);
+    padding:8px 4px calc(8px + env(safe-area-inset-bottom));
+    z-index:20;
+    max-width:460px;
+    margin:0 auto;
+  }
+  .tab-btn{
+    flex:1; border:none; background:none; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    color:var(--ink-soft); padding:4px 0;
+  }
+  .tab-btn svg{ width:22px; height:22px; }
+  .tab-btn.active{ color:var(--accent); }
+  .tab-btn-label{ font-size:10px; font-weight:700; }
+
+  .empty-note{ font-size:13px; color:var(--ink-soft); text-align:center; padding:60px 20px; line-height:1.6; }
+
+  /* ---- stats ---- */
+  .stat-row{ display:flex; gap:14px; }
+  .stat-card{ flex:1; background:var(--panel); border-radius:16px; padding:20px 16px; box-shadow: inset 0 0 0 1px var(--rule); }
+  .stat-num{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:30px; font-weight:700; color:var(--accent); }
+  .stat-label{ font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.08em; font-weight:700; margin-top:4px; }
+  .stat-sub{ font-size:12px; color:var(--ink-soft); margin-top:18px; }
+
+  /* ---- chess page ---- */
+  .top-bar{ display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+  .icon-btn{ border:none; background:var(--panel); width:38px; height:38px; border-radius:12px; color:var(--ink); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+  .chess-status{ font-size:13px; color:var(--ink-soft); text-align:center; margin-bottom:14px; }
+  .chess-status b{ color:var(--ink); }
+
+  .board{
+    width:100%; aspect-ratio:1;
+    display:grid; grid-template-columns:repeat(8,1fr); grid-template-rows:repeat(8,1fr);
+    border-radius:12px; overflow:hidden; box-shadow:0 8px 24px -10px rgba(0,0,0,0.6);
+  }
+  .sq{ position:relative; display:flex; align-items:center; justify-content:center; }
+  .sq.light{ background:var(--board-light); }
+  .sq.dark{ background:var(--board-dark); }
+  .sq.targetable::after{
+    content:""; position:absolute; inset:8%; border-radius:50%;
+    box-shadow:0 0 0 3px var(--accent);
+    animation:pulseTarget 1.3s ease-in-out infinite;
+  }
+  @keyframes pulseTarget{ 0%,100%{ opacity:0.55; } 50%{ opacity:1; } }
+  .piece{
+    width:78%; height:78%; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:15px; font-weight:800; font-family:-apple-system, sans-serif;
+    box-shadow:0 2px 3px rgba(0,0,0,0.3);
+    cursor:default;
+  }
+  .piece.black{ background:var(--piece-dark); color:#fff; }
+  .piece.white{ background:var(--piece-light); color:#1A1A1C; }
+  .sq.targetable .piece{ cursor:pointer; }
+
+  .chess-result{
+    margin-top:20px; background:var(--panel); border-radius:16px; padding:18px; box-shadow: inset 0 0 0 1px var(--rule); text-align:center;
+  }
+  .result-headline{ font-size:16px; font-weight:800; margin-bottom:6px; }
+  .result-headline.perfect{ color:var(--good); }
+  .result-sub{ font-size:12.5px; color:var(--ink-soft); line-height:1.6; }
+  .result-again{ font-size:11.5px; color:var(--ink-soft); margin-top:12px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="favoritesPage" class="page active">
+    <p class="eyebrow">Fox Games</p>
+    <h1>Favorites</h1>
+    <div class="game-grid" id="favoritesGrid"></div>
+  </div>
+
+  <div id="newGamesPage" class="page">
+    <p class="eyebrow">Fox Games</p>
+    <h1>New Games</h1>
+    <div class="empty-note">More games coming soon.</div>
+  </div>
+
+  <div id="statsPage" class="page">
+    <p class="eyebrow">Fox Games</p>
+    <h1>Statistics</h1>
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-num" id="statTotal">0</div>
+        <div class="stat-label">Total points</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="statAvg">0</div>
+        <div class="stat-label">Average points</div>
+      </div>
+    </div>
+    <p class="stat-sub" id="statSub"></p>
+  </div>
+
+  <div id="settingsPage" class="page">
+    <p class="eyebrow">Fox Games</p>
+    <h1>Settings</h1>
+    <div class="empty-note">Nothing here yet.</div>
+  </div>
+
+  <div id="chessPage" class="page">
+    <div class="top-bar">
+      <button class="icon-btn" id="chessBackBtn" aria-label="Back">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+      </button>
+      <div>
+        <p class="eyebrow">Daily Challenge</p>
+        <h1 style="margin-bottom:0;">Chess</h1>
+      </div>
+    </div>
+    <p class="chess-status" id="chessStatus"></p>
+    <div class="board" id="chessBoard"></div>
+    <div class="chess-result" id="chessResult" style="display:none;"></div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tabFavorites" data-page="favoritesPage">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.9 6.4.6-4.8 4.3 1.4 6.2L12 16.9 6.4 20l1.4-6.2L3 9.5l6.4-.6L12 3z"></path></svg>
+      <span class="tab-btn-label">Favorites</span>
+    </button>
+    <button class="tab-btn" id="tabNewGames" data-page="newGamesPage">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+      <span class="tab-btn-label">New Games</span>
+    </button>
+    <button class="tab-btn" id="tabStats" data-page="statsPage">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="20" x2="5" y2="11"></line><line x1="12" y1="20" x2="12" y2="6"></line><line x1="19" y1="20" x2="19" y2="14"></line></svg>
+      <span class="tab-btn-label">Statistics</span>
+    </button>
+    <button class="tab-btn" id="tabSettings" data-page="settingsPage">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1h.1a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"></path></svg>
+      <span class="tab-btn-label">Settings</span>
+    </button>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORAGE_KEY = "foxGames";
+  var store = { dailyLog: {} }; // dailyLog[gameId][dateStr] = { score, details }
+
+  function loadStore(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw){ var parsed = JSON.parse(raw); if (parsed && parsed.dailyLog) store = parsed; }
+    }catch(e){}
+  }
+  function saveStore(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }catch(e){}
+  }
+  function pad(n){ return n < 10 ? "0"+n : ""+n; }
+  function todayStr(){ var d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+
+  // ================= NAVIGATION =================
+  var pages = ["favoritesPage","newGamesPage","statsPage","settingsPage","chessPage"];
+  function showPage(id){
+    pages.forEach(function(p){ document.getElementById(p).classList.toggle("active", p===id); });
+    ["tabFavorites","tabNewGames","tabStats","tabSettings"].forEach(function(t){
+      document.getElementById(t).classList.toggle("active", document.getElementById(t).dataset.page === id);
+    });
+    if (id === "statsPage") renderStats();
+  }
+  document.querySelectorAll(".tab-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){ showPage(btn.dataset.page); });
+  });
+
+  // ================= FAVORITES GRID =================
+  var GAMES = [
+    { id:"chess", name:"Chess", page:"chessPage", icon:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.5 3-1.5 2-1.5-2L12 3z"/><path d="M8 21h8"/><path d="M9 21c-.5-3 .5-5 1-6.5C10.5 13 9 12 9 10c0-1.7 1.3-3 3-3s3 1.3 3 3c0 2-1.5 3-1.5 4.5.5 1.5 1.5 3.5 1 6.5"/></svg>'
+    }
+  ];
+  function renderFavorites(){
+    var grid = document.getElementById("favoritesGrid");
+    grid.innerHTML = "";
+    GAMES.forEach(function(g){
+      var tile = document.createElement("button");
+      tile.className = "game-tile";
+      tile.innerHTML = '<div class="tile-icon">'+g.icon+'</div><div class="tile-label">'+g.name+'</div>';
+      tile.addEventListener("click", function(){
+        showPage(g.page);
+        if (g.id === "chess") openChess();
+      });
+      grid.appendChild(tile);
+    });
+  }
+
+  // ================= STATISTICS =================
+  function renderStats(){
+    var total = 0, count = 0;
+    Object.keys(store.dailyLog).forEach(function(gameId){
+      var log = store.dailyLog[gameId];
+      Object.keys(log).forEach(function(date){
+        total += log[date].score;
+        count++;
+      });
+    });
+    var avg = count > 0 ? (total / count) : 0;
+    document.getElementById("statTotal").textContent = total;
+    document.getElementById("statAvg").textContent = (Math.round(avg * 10) / 10);
+    document.getElementById("statSub").textContent = count > 0
+      ? ("Based on " + count + " day" + (count===1?"":"s") + " played.")
+      : "Play a daily challenge to start tracking.";
+  }
+
+  // ================= CHESS ENGINE =================
+  var PIECE_VALUES = { P:1, N:3, B:3, R:5, Q:9, K:0 };
+  var PIECE_NAMES = { P:"Pawn", N:"Knight", B:"Bishop", R:"Rook", Q:"Queen", K:"King" };
+  var BISHOP_DIRS = [[-1,-1],[-1,1],[1,-1],[1,1]];
+  var ROOK_DIRS = [[-1,0],[1,0],[0,-1],[0,1]];
+  var QUEEN_DIRS = BISHOP_DIRS.concat(ROOK_DIRS);
+  var KNIGHT_OFFSETS = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+
+  function initialBoard(){
+    var back = ["R","N","B","Q","K","B","N","R"];
+    var b = [];
+    b.push(back.map(function(t){ return { color:"b", type:t }; }));
+    b.push(Array(8).fill(0).map(function(){ return { color:"b", type:"P" }; }));
+    for (var i=0;i<4;i++) b.push(Array(8).fill(null));
+    b.push(Array(8).fill(0).map(function(){ return { color:"w", type:"P" }; }));
+    b.push(back.map(function(t){ return { color:"w", type:t }; }));
+    return b;
+  }
+  function inBounds(r,c){ return r>=0 && r<8 && c>=0 && c<8; }
+
+  // returns list of {r,c,capture:bool}
+  function movesForSquare(board, r, c){
+    var piece = board[r][c];
+    if (!piece) return [];
+    var moves = [];
+    var enemy = piece.color === "w" ? "b" : "w";
+
+    function tryStep(nr,nc,onlyCapture,onlyQuiet){
+      if (!inBounds(nr,nc)) return false;
+      var target = board[nr][nc];
+      if (!target){
+        if (!onlyCapture) moves.push({ r:nr, c:nc, capture:false });
+        return true; // empty, can continue sliding
+      }
+      if (target.color === enemy){
+        if (!onlyQuiet && target.type !== "K") moves.push({ r:nr, c:nc, capture:true });
+        return false; // blocked after capture
+      }
+      return false; // own piece, blocked
+    }
+
+    if (piece.type === "P"){
+      var dir = piece.color === "w" ? -1 : 1;
+      var startRow = piece.color === "w" ? 6 : 1;
+      if (inBounds(r+dir,c) && !board[r+dir][c]){
+        moves.push({ r:r+dir, c:c, capture:false });
+        if (r === startRow && !board[r+2*dir][c]){
+          moves.push({ r:r+2*dir, c:c, capture:false });
+        }
+      }
+      [-1,1].forEach(function(dc){
+        var nr=r+dir, nc=c+dc;
+        if (inBounds(nr,nc) && board[nr][nc] && board[nr][nc].color===enemy && board[nr][nc].type!=="K"){
+          moves.push({ r:nr, c:nc, capture:true });
+        }
+      });
+    } else if (piece.type === "N"){
+      KNIGHT_OFFSETS.forEach(function(o){
+        var nr=r+o[0], nc=c+o[1];
+        if (!inBounds(nr,nc)) return;
+        var t = board[nr][nc];
+        if (!t) moves.push({ r:nr, c:nc, capture:false });
+        else if (t.color===enemy && t.type!=="K") moves.push({ r:nr, c:nc, capture:true });
+      });
+    } else if (piece.type === "K"){
+      QUEEN_DIRS.forEach(function(d){
+        var nr=r+d[0], nc=d[1]+c;
+        if (!inBounds(nr,nc)) return;
+        var t = board[nr][nc];
+        if (!t) moves.push({ r:nr, c:nc, capture:false });
+        else if (t.color===enemy && t.type!=="K") moves.push({ r:nr, c:nc, capture:true });
+      });
+    } else {
+      var dirs = piece.type === "B" ? BISHOP_DIRS : piece.type === "R" ? ROOK_DIRS : QUEEN_DIRS;
+      dirs.forEach(function(d){
+        var nr=r+d[0], nc=c+d[1];
+        while (inBounds(nr,nc)){
+          var t = board[nr][nc];
+          if (!t){ moves.push({ r:nr, c:nc, capture:false }); nr+=d[0]; nc+=d[1]; continue; }
+          if (t.color===enemy && t.type!=="K") moves.push({ r:nr, c:nc, capture:true });
+          break;
+        }
+      });
+    }
+    return moves;
+  }
+
+  function allMovesForColor(board, color){
+    var out = [];
+    for (var r=0;r<8;r++) for (var c=0;c<8;c++){
+      var p = board[r][c];
+      if (p && p.color===color){
+        movesForSquare(board,r,c).forEach(function(m){ out.push({ fr:r, fc:c, tr:m.r, tc:m.c, capture:m.capture }); });
+      }
+    }
+    return out;
+  }
+
+  // deterministic PRNG seeded from a string (mulberry32)
+  function hashString(str){
+    var h = 1779033703 ^ str.length;
+    for (var i=0;i<str.length;i++){
+      h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+      h = (h << 13) | (h >>> 19);
+    }
+    return h >>> 0;
+  }
+  function mulberry32(seed){
+    return function(){
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function simulateWalk(rng, halfMoves){
+    var board = initialBoard();
+    var side = "w";
+    for (var i=0;i<halfMoves;i++){
+      var moves = allMovesForColor(board, side);
+      if (moves.length === 0) break;
+      var m = moves[Math.floor(rng() * moves.length)];
+      board[m.tr][m.tc] = board[m.fr][m.fc];
+      board[m.fr][m.fc] = null;
+      side = side === "w" ? "b" : "w";
+    }
+    return { board:board, side:side };
+  }
+
+  function generateDailyPuzzle(dateStr){
+    var baseSeed = hashString("fox-chess-" + dateStr);
+    for (var attempt=0; attempt<40; attempt++){
+      var rng = mulberry32((baseSeed + attempt*7919) >>> 0);
+      var halfMoves = 8 + Math.floor(rng() * 10);
+      var sim = simulateWalk(rng, halfMoves);
+      var allMoves = allMovesForColor(sim.board, sim.side);
+      var captureMoves = allMoves.filter(function(m){ return m.capture; });
+      if (captureMoves.length > 0){
+        // dedupe by target square, value is same regardless of attacker
+        var targets = {};
+        captureMoves.forEach(function(m){
+          var key = m.tr + "," + m.tc;
+          var capturedType = sim.board[m.tr][m.tc].type;
+          targets[key] = { r:m.tr, c:m.tc, type:capturedType, value:PIECE_VALUES[capturedType] };
+        });
+        var targetList = Object.keys(targets).map(function(k){ return targets[k]; });
+        var best = targetList.reduce(function(a,b){ return b.value > a.value ? b : a; });
+        return { board:sim.board, side:sim.side, targets:targetList, best:best };
+      }
+    }
+    return null; // extremely unlikely
+  }
+
+  // ================= CHESS UI =================
+  var chessPuzzle = null;
+  var chessLocked = false;
+
+  function openChess(){
+    var today = todayStr();
+    var existing = (store.dailyLog.chess || {})[today];
+    chessPuzzle = generateDailyPuzzle(today);
+    if (!chessPuzzle){
+      document.getElementById("chessStatus").textContent = "Couldn't generate today's puzzle — try again tomorrow.";
+      document.getElementById("chessBoard").innerHTML = "";
+      return;
+    }
+    chessLocked = !!existing;
+    renderChessBoard(chessPuzzle, !chessLocked);
+    var sideLabel = chessPuzzle.side === "w" ? "White" : "Black";
+    document.getElementById("chessStatus").innerHTML = "<b>" + sideLabel + "</b> to move — find the highest-value capture.";
+    if (chessLocked){
+      showChessResult(existing.details.capturedType, existing.details.capturedValue, existing.details.bestType, existing.details.bestValue, true);
+    } else {
+      document.getElementById("chessResult").style.display = "none";
+    }
+  }
+
+  function pieceGlyph(type){
+    if (type === "N") return "Kn";
+    return type;
+  }
+
+  function renderChessBoard(puzzle, interactive){
+    var boardEl = document.getElementById("chessBoard");
+    boardEl.innerHTML = "";
+    var targetMap = {};
+    puzzle.targets.forEach(function(t){ targetMap[t.r+","+t.c] = t; });
+
+    for (var r=0;r<8;r++){
+      for (var c=0;c<8;c++){
+        var sq = document.createElement("div");
+        sq.className = "sq " + (((r+c)%2===0) ? "light" : "dark");
+        var piece = puzzle.board[r][c];
+        var key = r+","+c;
+        var isTarget = interactive && targetMap[key];
+        if (isTarget) sq.classList.add("targetable");
+        if (piece){
+          var pEl = document.createElement("div");
+          pEl.className = "piece " + (piece.color === "b" ? "black" : "white");
+          pEl.textContent = pieceGlyph(piece.type);
+          sq.appendChild(pEl);
+        }
+        if (isTarget){
+          (function(t){
+            sq.addEventListener("click", function(){ handleChessCapture(t); });
+          })(targetMap[key]);
+        }
+        boardEl.appendChild(sq);
+      }
+    }
+  }
+
+  function handleChessCapture(target){
+    if (chessLocked) return;
+    chessLocked = true;
+    var best = chessPuzzle.best;
+    var today = todayStr();
+    if (!store.dailyLog.chess) store.dailyLog.chess = {};
+    store.dailyLog.chess[today] = {
+      score: target.value,
+      details: { capturedType:target.type, capturedValue:target.value, bestType:best.type, bestValue:best.value }
+    };
+    saveStore();
+    renderChessBoard(chessPuzzle, false);
+    showChessResult(target.type, target.value, best.type, best.value, false);
+  }
+
+  function showChessResult(capturedType, capturedValue, bestType, bestValue, alreadyPlayed){
+    var box = document.getElementById("chessResult");
+    var perfect = capturedValue >= bestValue;
+    var headline = perfect
+      ? "Perfect — best capture found!"
+      : "You captured a " + PIECE_NAMES[capturedType] + " (+" + capturedValue + ")";
+    var sub = perfect
+      ? ("The " + PIECE_NAMES[capturedType] + " was worth " + capturedValue + " points — the most available today.")
+      : ("The best available capture today was the " + PIECE_NAMES[bestType] + " (+" + bestValue + ").");
+    box.innerHTML =
+      '<div class="result-headline' + (perfect ? ' perfect' : '') + '">' + headline + '</div>' +
+      '<div class="result-sub">' + sub + '</div>' +
+      (alreadyPlayed ? '<div class="result-again">You already played today\'s challenge — come back tomorrow for a new one.</div>' : '');
+    box.style.display = "block";
+  }
+
+  document.getElementById("chessBackBtn").addEventListener("click", function(){ showPage("favoritesPage"); });
+
+  loadStore();
+  renderFavorites();
+})();
+</script>
+</body>
+</html>
