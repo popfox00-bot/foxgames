@@ -23,24 +23,10 @@
     --board-dark:#2B2B2E;
     --piece-dark:#1A1A1C;
     --piece-light:#D9D9D6;
-  }
-  [data-theme="light"]{
-    --bg:#F4F1EA;
-    --panel:#FFFFFF;
-    --panel-hi:#F0ECE2;
-    --ink:#232323;
-    --ink-soft:#7A756B;
-    --accent:#E2793D;
-    --accent-soft:#FBEAE0;
-    --good:#3E8F5F;
-    --rule:rgba(35,35,35,0.09);
-    --board-light:#F7F6F3;
-    --board-dark:#2B2B2E;
-    --piece-dark:#1A1A1C;
-    --piece-light:#E4E4E1;
+    --piece-red:#C0453A;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{height:100%; transition:background .2s;}
+  html,body{height:100%;}
   body{
     margin:0;
     background:var(--bg);
@@ -56,9 +42,9 @@
   .eyebrow{ font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--ink-soft); font-weight:700; margin:0 0 4px 2px; }
   h1{ font-size:26px; font-weight:800; letter-spacing:-0.01em; margin:0 0 22px 2px; }
 
-  /* ---- favorites grid ---- */
+  /* ---- favorites / new games grid ---- */
   .game-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:18px; }
-  .game-tile{ display:flex; flex-direction:column; align-items:center; gap:8px; border:none; background:none; cursor:pointer; }
+  .game-tile{ display:flex; flex-direction:column; align-items:center; gap:8px; border:none; background:none; cursor:pointer; width:100%; }
   .tile-icon{
     width:100%; aspect-ratio:1; border-radius:20px;
     background:linear-gradient(160deg, var(--accent), #B85A24);
@@ -67,6 +53,10 @@
   }
   .tile-icon svg{ width:58%; height:58%; }
   .tile-label{ font-size:12px; font-weight:700; color:var(--ink); }
+  .new-game-item{ display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .heart-btn{ border:none; background:none; cursor:pointer; padding:6px; margin-top:0; display:flex; align-items:center; justify-content:center; }
+  .heart-btn svg{ width:18px; height:18px; fill:none; stroke:var(--ink-soft); stroke-width:1.7; transition:fill .15s ease, stroke .15s ease, transform .15s ease; }
+  .heart-btn.filled svg{ fill:var(--accent); stroke:var(--accent); transform:scale(1.08); }
 
   /* ---- bottom tab bar ---- */
   .tab-bar{
@@ -97,7 +87,7 @@
   .stat-label{ font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.08em; font-weight:700; margin-top:4px; }
   .stat-sub{ font-size:12px; color:var(--ink-soft); margin-top:18px; }
 
-  /* ---- chess page ---- */
+  /* ---- game pages (Best Move + Checkers share these) ---- */
   .top-bar{ display:flex; align-items:center; gap:12px; margin-bottom:18px; }
   .icon-btn{ border:none; background:var(--panel); width:38px; height:38px; border-radius:12px; color:var(--ink); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
   .chess-status{ font-size:13px; color:var(--ink-soft); text-align:center; margin-bottom:14px; }
@@ -111,30 +101,16 @@
   .sq{ position:relative; display:flex; align-items:center; justify-content:center; }
   .sq.light{ background:var(--board-light); }
   .sq.dark{ background:var(--board-dark); }
-
-  /* a friendly piece that has at least one legal capture — faint hint it's tappable */
-  .piece.selectable{ box-shadow:0 0 0 2px rgba(226,121,61,0.4), 0 2px 3px rgba(0,0,0,0.3); cursor:pointer; }
-  /* the piece currently selected as the mover */
-  .piece.selected{ box-shadow:0 0 0 3px var(--accent), 0 2px 3px rgba(0,0,0,0.3); }
-
-  /* a legal destination for the selected piece, not yet tapped */
-  .sq.dest-hint::after{
-    content:""; position:absolute; inset:13%; border-radius:50%;
-    border:2px solid rgba(143,193,232,0.5);
+  .sq.targetable::after{
+    content:""; position:absolute; inset:8%; border-radius:50%;
+    box-shadow:0 0 0 3px var(--accent);
     animation:pulseTarget 1.3s ease-in-out infinite;
   }
-  /* destination tapped once — pending preview, dashed light blue */
-  .sq.dest-preview::after{
-    content:""; position:absolute; inset:9%; border-radius:50%;
-    border:3px dashed #8FC1E8;
+  .sq.selected::before{
+    content:""; position:absolute; inset:5%; border-radius:10px;
+    box-shadow:0 0 0 3px var(--good) inset;
   }
-  /* destination tapped a second time — confirmed, darker solid blue */
-  .sq.dest-confirm::after{
-    content:""; position:absolute; inset:9%; border-radius:50%;
-    background:rgba(45,110,175,0.35);
-    border:3px solid #2D6EAF;
-  }
-  @keyframes pulseTarget{ 0%,100%{ opacity:0.5; } 50%{ opacity:1; } }
+  @keyframes pulseTarget{ 0%,100%{ opacity:0.55; } 50%{ opacity:1; } }
   .piece{
     width:78%; height:78%; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
@@ -144,6 +120,9 @@
   }
   .piece.black{ background:var(--piece-dark); color:#fff; }
   .piece.white{ background:var(--piece-light); color:#1A1A1C; }
+  .piece.red{ background:var(--piece-red); color:#fff; }
+  .sq.targetable .piece{ cursor:pointer; }
+  .sq.movable .piece{ cursor:pointer; box-shadow:0 2px 3px rgba(0,0,0,0.3), 0 0 0 2px var(--accent-soft); }
 
   .chess-result{
     margin-top:20px; background:var(--panel); border-radius:16px; padding:18px; box-shadow: inset 0 0 0 1px var(--rule); text-align:center;
@@ -153,12 +132,7 @@
   .result-sub{ font-size:12.5px; color:var(--ink-soft); line-height:1.6; }
   .result-again{ font-size:11.5px; color:var(--ink-soft); margin-top:12px; }
 
-  /* ---- settings ---- */
-  .setting-row{ display:flex; align-items:center; justify-content:space-between; background:var(--panel); border-radius:14px; padding:16px; box-shadow: inset 0 0 0 1px var(--rule); margin-bottom:12px; }
-  .setting-label{ font-size:14px; font-weight:700; }
-  .theme-toggle{ display:flex; background:var(--panel-hi); border-radius:10px; padding:3px; }
-  .theme-btn{ border:none; background:none; padding:8px 14px; border-radius:8px; font-size:12.5px; font-weight:700; color:var(--ink-soft); cursor:pointer; }
-  .theme-btn.active{ background:var(--accent); color:#fff; }
+  .text-btn{ margin-top:14px; width:100%; border:none; background:var(--panel); color:var(--ink); font-weight:700; font-size:13px; padding:12px; border-radius:12px; cursor:pointer; box-shadow: inset 0 0 0 1px var(--rule); }
 </style>
 </head>
 <body>
@@ -173,7 +147,7 @@
   <div id="newGamesPage" class="page">
     <p class="eyebrow">Fox Games</p>
     <h1>New Games</h1>
-    <div class="empty-note">More games coming soon.</div>
+    <div class="game-grid" id="newGamesGrid"></div>
   </div>
 
   <div id="statsPage" class="page">
@@ -186,7 +160,7 @@
       </div>
       <div class="stat-card">
         <div class="stat-num" id="statAvg">0</div>
-        <div class="stat-label">Avg % of max</div>
+        <div class="stat-label">Average points</div>
       </div>
     </div>
     <p class="stat-sub" id="statSub"></p>
@@ -195,13 +169,7 @@
   <div id="settingsPage" class="page">
     <p class="eyebrow">Fox Games</p>
     <h1>Settings</h1>
-    <div class="setting-row">
-      <div class="setting-label">Appearance</div>
-      <div class="theme-toggle">
-        <button class="theme-btn" id="themeLightBtn">Light</button>
-        <button class="theme-btn" id="themeDarkBtn">Dark</button>
-      </div>
-    </div>
+    <div class="empty-note">Nothing here yet.</div>
   </div>
 
   <div id="chessPage" class="page">
@@ -211,12 +179,28 @@
       </button>
       <div>
         <p class="eyebrow">Daily Challenge</p>
-        <h1 style="margin-bottom:0;">Chess</h1>
+        <h1 style="margin-bottom:0;">Best Move</h1>
       </div>
     </div>
     <p class="chess-status" id="chessStatus"></p>
     <div class="board" id="chessBoard"></div>
     <div class="chess-result" id="chessResult" style="display:none;"></div>
+  </div>
+
+  <div id="checkersPage" class="page">
+    <div class="top-bar">
+      <button class="icon-btn" id="checkersBackBtn" aria-label="Back">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+      </button>
+      <div>
+        <p class="eyebrow">Vs. Robot</p>
+        <h1 style="margin-bottom:0;">Checkers</h1>
+      </div>
+    </div>
+    <p class="chess-status" id="checkersStatus"></p>
+    <div class="board" id="checkersBoard"></div>
+    <div class="chess-result" id="checkersResult" style="display:none;"></div>
+    <button class="text-btn" id="checkersNewGameBtn">New Game</button>
   </div>
 
   <div class="tab-bar">
@@ -245,16 +229,12 @@
   "use strict";
 
   var STORAGE_KEY = "foxGames";
-  var store = { dailyLog: {}, settings: { theme:"dark" } }; // dailyLog[gameId][dateStr] = { score, maxPossible, details }
+  var store = { dailyLog: {}, favorites: null };
 
   function loadStore(){
     try{
       var raw = localStorage.getItem(STORAGE_KEY);
-      if (raw){
-        var parsed = JSON.parse(raw);
-        if (parsed && parsed.dailyLog) store = parsed;
-        if (!store.settings) store.settings = { theme:"dark" };
-      }
+      if (raw){ var parsed = JSON.parse(raw); if (parsed && parsed.dailyLog) store = parsed; }
     }catch(e){}
   }
   function saveStore(){
@@ -263,77 +243,123 @@
   function pad(n){ return n < 10 ? "0"+n : ""+n; }
   function todayStr(){ var d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
 
-  // ================= THEME =================
-  function applyTheme(theme){
-    document.documentElement.setAttribute("data-theme", theme);
-    document.getElementById("themeLightBtn").classList.toggle("active", theme === "light");
-    document.getElementById("themeDarkBtn").classList.toggle("active", theme === "dark");
-    document.querySelector('meta[name="theme-color"]').setAttribute("content", theme === "light" ? "#F4F1EA" : "#1F2430");
+  // ================= GAME CATALOG =================
+  var GAMES = [
+    { id:"chess", name:"Best Move", page:"chessPage", defaultFavorite:true, icon:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.5 3-1.5 2-1.5-2L12 3z"/><path d="M8 21h8"/><path d="M9 21c-.5-3 .5-5 1-6.5C10.5 13 9 12 9 10c0-1.7 1.3-3 3-3s3 1.3 3 3c0 2-1.5 3-1.5 4.5.5 1.5 1.5 3.5 1 6.5"/></svg>'
+    },
+    { id:"checkers", name:"Checkers", page:"checkersPage", defaultFavorite:false, icon:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="15" r="5"/><circle cx="15" cy="9" r="5"/></svg>'
+    }
+  ];
+  function ensureFavorites(){
+    if (!store.favorites || !Array.isArray(store.favorites)){
+      store.favorites = GAMES.filter(function(g){ return g.defaultFavorite; }).map(function(g){ return g.id; });
+      saveStore();
+    }
   }
-  function setTheme(theme){
-    store.settings.theme = theme;
-    saveStore();
-    applyTheme(theme);
+  function isFavorite(id){ return store.favorites.indexOf(id) !== -1; }
+  function addFavorite(id){
+    if (!isFavorite(id)){ store.favorites.push(id); saveStore(); }
   }
-  document.getElementById("themeLightBtn").addEventListener("click", function(){ setTheme("light"); });
-  document.getElementById("themeDarkBtn").addEventListener("click", function(){ setTheme("dark"); });
 
   // ================= NAVIGATION =================
-  var pages = ["favoritesPage","newGamesPage","statsPage","settingsPage","chessPage"];
+  var pages = ["favoritesPage","newGamesPage","statsPage","settingsPage","chessPage","checkersPage"];
   function showPage(id){
     pages.forEach(function(p){ document.getElementById(p).classList.toggle("active", p===id); });
     ["tabFavorites","tabNewGames","tabStats","tabSettings"].forEach(function(t){
       document.getElementById(t).classList.toggle("active", document.getElementById(t).dataset.page === id);
     });
     if (id === "statsPage") renderStats();
+    if (id === "favoritesPage") renderFavorites();
+    if (id === "newGamesPage") renderNewGames();
   }
   document.querySelectorAll(".tab-btn").forEach(function(btn){
     btn.addEventListener("click", function(){ showPage(btn.dataset.page); });
   });
 
+  function openGame(g){
+    showPage(g.page);
+    if (g.id === "chess") openChess();
+    else if (g.id === "checkers") openCheckers();
+  }
+
   // ================= FAVORITES GRID =================
-  var GAMES = [
-    { id:"chess", name:"Chess", page:"chessPage", icon:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.5 3-1.5 2-1.5-2L12 3z"/><path d="M8 21h8"/><path d="M9 21c-.5-3 .5-5 1-6.5C10.5 13 9 12 9 10c0-1.7 1.3-3 3-3s3 1.3 3 3c0 2-1.5 3-1.5 4.5.5 1.5 1.5 3.5 1 6.5"/></svg>'
-    }
-  ];
   function renderFavorites(){
     var grid = document.getElementById("favoritesGrid");
     grid.innerHTML = "";
-    GAMES.forEach(function(g){
+    var favGames = GAMES.filter(function(g){ return isFavorite(g.id); });
+    if (favGames.length === 0){
+      grid.innerHTML = '<div class="empty-note" style="grid-column:1/-1;">No favorites yet — add one from New Games.</div>';
+      return;
+    }
+    favGames.forEach(function(g){
       var tile = document.createElement("button");
       tile.className = "game-tile";
       tile.innerHTML = '<div class="tile-icon">'+g.icon+'</div><div class="tile-label">'+g.name+'</div>';
-      tile.addEventListener("click", function(){
-        showPage(g.page);
-        if (g.id === "chess") openChess();
-      });
+      tile.addEventListener("click", function(){ openGame(g); });
       grid.appendChild(tile);
+    });
+  }
+
+  // ================= NEW GAMES GRID =================
+  function renderNewGames(){
+    var grid = document.getElementById("newGamesGrid");
+    grid.innerHTML = "";
+    var newGames = GAMES.filter(function(g){ return !isFavorite(g.id); });
+    if (newGames.length === 0){
+      grid.innerHTML = '<div class="empty-note" style="grid-column:1/-1;">You\'ve favorited everything here. More games coming soon.</div>';
+      return;
+    }
+    newGames.forEach(function(g){
+      var item = document.createElement("div");
+      item.className = "new-game-item";
+
+      var tile = document.createElement("button");
+      tile.className = "game-tile";
+      tile.innerHTML = '<div class="tile-icon">'+g.icon+'</div><div class="tile-label">'+g.name+'</div>';
+      tile.addEventListener("click", function(){ openGame(g); });
+
+      var heart = document.createElement("button");
+      heart.className = "heart-btn";
+      heart.setAttribute("aria-label", "Save "+g.name+" to Favorites");
+      heart.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-10-9.2C.5 8.4 2 4.5 5.6 4c2-.3 3.8.8 4.9 2.5C11.6 4.8 13.4 3.7 15.4 4c3.6.5 5.1 4.4 3.6 7.8C19.5 16.4 12 21 12 21z"/></svg>';
+      heart.addEventListener("click", function(e){
+        e.stopPropagation();
+        if (heart.classList.contains("filled")) return;
+        heart.classList.add("filled");
+        addFavorite(g.id);
+        setTimeout(function(){
+          renderNewGames();
+          renderFavorites();
+        }, 260);
+      });
+
+      item.appendChild(tile);
+      item.appendChild(heart);
+      grid.appendChild(item);
     });
   }
 
   // ================= STATISTICS =================
   function renderStats(){
-    var total = 0, count = 0, pctSum = 0;
+    var total = 0, count = 0;
     Object.keys(store.dailyLog).forEach(function(gameId){
       var log = store.dailyLog[gameId];
       Object.keys(log).forEach(function(date){
-        var entry = log[date];
-        total += entry.score;
-        var maxP = entry.maxPossible !== undefined ? entry.maxPossible : (entry.details && entry.details.bestValue);
-        if (maxP > 0) pctSum += (entry.score / maxP) * 100;
+        total += log[date].score;
         count++;
       });
     });
-    var avgPct = count > 0 ? (pctSum / count) : 0;
+    var avg = count > 0 ? (total / count) : 0;
     document.getElementById("statTotal").textContent = total;
-    document.getElementById("statAvg").textContent = (Math.round(avgPct * 10) / 10) + "%";
+    document.getElementById("statAvg").textContent = (Math.round(avg * 10) / 10);
     document.getElementById("statSub").textContent = count > 0
       ? ("Based on " + count + " day" + (count===1?"":"s") + " played.")
       : "Play a daily challenge to start tracking.";
   }
 
-  // ================= CHESS ENGINE =================
+  // ================= BEST MOVE (CHESS) ENGINE =================
   var PIECE_VALUES = { P:1, N:3, B:3, R:5, Q:9, K:0 };
   var PIECE_NAMES = { P:"Pawn", N:"Knight", B:"Bishop", R:"Rook", Q:"Queen", K:"King" };
   var BISHOP_DIRS = [[-1,-1],[-1,1],[1,-1],[1,1]];
@@ -353,26 +379,11 @@
   }
   function inBounds(r,c){ return r>=0 && r<8 && c>=0 && c<8; }
 
-  // returns list of {r,c,capture:bool}
   function movesForSquare(board, r, c){
     var piece = board[r][c];
     if (!piece) return [];
     var moves = [];
     var enemy = piece.color === "w" ? "b" : "w";
-
-    function tryStep(nr,nc,onlyCapture,onlyQuiet){
-      if (!inBounds(nr,nc)) return false;
-      var target = board[nr][nc];
-      if (!target){
-        if (!onlyCapture) moves.push({ r:nr, c:nc, capture:false });
-        return true; // empty, can continue sliding
-      }
-      if (target.color === enemy){
-        if (!onlyQuiet && target.type !== "K") moves.push({ r:nr, c:nc, capture:true });
-        return false; // blocked after capture
-      }
-      return false; // own piece, blocked
-    }
 
     if (piece.type === "P"){
       var dir = piece.color === "w" ? -1 : 1;
@@ -431,7 +442,6 @@
     return out;
   }
 
-  // deterministic PRNG seeded from a string (mulberry32)
   function hashString(str){
     var h = 1779033703 ^ str.length;
     for (var i=0;i<str.length;i++){
@@ -472,7 +482,6 @@
       var allMoves = allMovesForColor(sim.board, sim.side);
       var captureMoves = allMoves.filter(function(m){ return m.capture; });
       if (captureMoves.length > 0){
-        // dedupe by target square, value is same regardless of attacker
         var targets = {};
         captureMoves.forEach(function(m){
           var key = m.tr + "," + m.tc;
@@ -484,35 +493,29 @@
         return { board:sim.board, side:sim.side, targets:targetList, best:best };
       }
     }
-    return null; // extremely unlikely
+    return null;
   }
 
-  // ================= CHESS UI =================
   var chessPuzzle = null;
   var chessLocked = false;
-  var selectedSquare = null;   // {r,c} of the piece currently selected as mover
-  var previewSquare = null;    // {r,c} of a destination tapped once, awaiting confirm
 
   function openChess(){
     var today = todayStr();
     var existing = (store.dailyLog.chess || {})[today];
     chessPuzzle = generateDailyPuzzle(today);
-    selectedSquare = null;
-    previewSquare = null;
     if (!chessPuzzle){
       document.getElementById("chessStatus").textContent = "Couldn't generate today's puzzle — try again tomorrow.";
       document.getElementById("chessBoard").innerHTML = "";
       return;
     }
     chessLocked = !!existing;
+    renderChessBoard(chessPuzzle, !chessLocked);
     var sideLabel = chessPuzzle.side === "w" ? "White" : "Black";
     document.getElementById("chessStatus").innerHTML = "<b>" + sideLabel + "</b> to move — find the highest-value capture.";
     if (chessLocked){
-      renderChessBoard(false);
       showChessResult(existing.details.capturedType, existing.details.capturedValue, existing.details.bestType, existing.details.bestValue, true);
     } else {
       document.getElementById("chessResult").style.display = "none";
-      renderChessBoard(true);
     }
   }
 
@@ -521,126 +524,49 @@
     return type;
   }
 
-  // legal capture destinations for the currently selected piece
-  function destinationsForSelected(){
-    if (!selectedSquare) return [];
-    return movesForSquare(chessPuzzle.board, selectedSquare.r, selectedSquare.c).filter(function(m){ return m.capture; });
-  }
-
-  function renderChessBoard(interactive){
+  function renderChessBoard(puzzle, interactive){
     var boardEl = document.getElementById("chessBoard");
     boardEl.innerHTML = "";
-    var board = chessPuzzle.board;
-    var dests = interactive ? destinationsForSelected() : [];
-    var destMap = {};
-    dests.forEach(function(d){ destMap[d.r+","+d.c] = true; });
+    var targetMap = {};
+    puzzle.targets.forEach(function(t){ targetMap[t.r+","+t.c] = t; });
 
     for (var r=0;r<8;r++){
       for (var c=0;c<8;c++){
         var sq = document.createElement("div");
         sq.className = "sq " + (((r+c)%2===0) ? "light" : "dark");
-        var piece = board[r][c];
+        var piece = puzzle.board[r][c];
         var key = r+","+c;
-        var isSelected = selectedSquare && selectedSquare.r===r && selectedSquare.c===c;
-        var isDest = destMap[key];
-        var isPreview = previewSquare && previewSquare.r===r && previewSquare.c===c;
-
-        if (isDest && !isPreview) sq.classList.add("dest-hint");
-        if (isPreview) sq.classList.add("dest-preview");
-
+        var isTarget = interactive && targetMap[key];
+        if (isTarget) sq.classList.add("targetable");
         if (piece){
           var pEl = document.createElement("div");
           pEl.className = "piece " + (piece.color === "b" ? "black" : "white");
           pEl.textContent = pieceGlyph(piece.type);
-          if (isSelected) pEl.classList.add("selected");
-          else if (interactive && piece.color === chessPuzzle.side && !selectedSquare && hasAnyCapture(r,c)){
-            pEl.classList.add("selectable");
-          }
           sq.appendChild(pEl);
         }
-
-        if (interactive){
-          (function(rr,cc){
-            sq.addEventListener("click", function(){ handleSquareClick(rr,cc); });
-          })(r,c);
+        if (isTarget){
+          (function(t){
+            sq.addEventListener("click", function(){ handleChessCapture(t); });
+          })(targetMap[key]);
         }
         boardEl.appendChild(sq);
       }
     }
   }
 
-  function hasAnyCapture(r,c){
-    return movesForSquare(chessPuzzle.board, r, c).some(function(m){ return m.capture; });
-  }
-
-  function handleSquareClick(r,c){
+  function handleChessCapture(target){
     if (chessLocked) return;
-    var board = chessPuzzle.board;
-    var piece = board[r][c];
-    var key = r+","+c;
-
-    // clicking the already-selected piece again: deselect
-    if (selectedSquare && selectedSquare.r===r && selectedSquare.c===c){
-      selectedSquare = null; previewSquare = null; renderChessBoard(true); return;
-    }
-
-    // clicking one of your own capturing pieces: (re)select it
-    if (piece && piece.color === chessPuzzle.side && hasAnyCapture(r,c)){
-      selectedSquare = { r:r, c:c };
-      previewSquare = null;
-      renderChessBoard(true);
-      return;
-    }
-
-    // clicking a legal destination for the currently selected piece
-    if (selectedSquare){
-      var isLegalDest = destinationsForSelected().some(function(d){ return d.r===r && d.c===c; });
-      if (isLegalDest){
-        if (previewSquare && previewSquare.r===r && previewSquare.c===c){
-          confirmChessMove(r,c);
-        } else {
-          previewSquare = { r:r, c:c };
-          renderChessBoard(true);
-        }
-        return;
-      }
-    }
-
-    // anything else: reset selection
-    selectedSquare = null; previewSquare = null; renderChessBoard(true);
-  }
-
-  function confirmChessMove(r,c){
-    var board = chessPuzzle.board;
-    var captured = board[r][c];
-    var mover = board[selectedSquare.r][selectedSquare.c];
+    chessLocked = true;
     var best = chessPuzzle.best;
-
-    // flash the confirmed (darker blue) state briefly before executing the move
-    var boardEl = document.getElementById("chessBoard");
-    var idx = r*8 + c;
-    var sqEl = boardEl.children[idx];
-    sqEl.classList.remove("dest-preview");
-    sqEl.classList.add("dest-confirm");
-
-    setTimeout(function(){
-      board[r][c] = mover;
-      board[selectedSquare.r][selectedSquare.c] = null;
-
-      chessLocked = true;
-      var today = todayStr();
-      if (!store.dailyLog.chess) store.dailyLog.chess = {};
-      store.dailyLog.chess[today] = {
-        score: PIECE_VALUES[captured.type],
-        maxPossible: best.value,
-        details: { capturedType:captured.type, capturedValue:PIECE_VALUES[captured.type], bestType:best.type, bestValue:best.value }
-      };
-      saveStore();
-
-      selectedSquare = null; previewSquare = null;
-      renderChessBoard(false);
-      showChessResult(captured.type, PIECE_VALUES[captured.type], best.type, best.value, false);
-    }, 300);
+    var today = todayStr();
+    if (!store.dailyLog.chess) store.dailyLog.chess = {};
+    store.dailyLog.chess[today] = {
+      score: target.value,
+      details: { capturedType:target.type, capturedValue:target.value, bestType:best.type, bestValue:best.value }
+    };
+    saveStore();
+    renderChessBoard(chessPuzzle, false);
+    showChessResult(target.type, target.value, best.type, best.value, false);
   }
 
   function showChessResult(capturedType, capturedValue, bestType, bestValue, alreadyPlayed){
@@ -661,8 +587,245 @@
 
   document.getElementById("chessBackBtn").addEventListener("click", function(){ showPage("favoritesPage"); });
 
+  // ================= CHECKERS ENGINE =================
+  // player = "r" (red, bottom, moves up), robot = "b" (black, top, moves down)
+  function ckInitBoard(){
+    var b = [];
+    for (var r=0;r<8;r++) b.push(Array(8).fill(null));
+    for (var r=0;r<3;r++){
+      for (var c=0;c<8;c++){
+        if ((r+c)%2===1) b[r][c] = { color:"b", king:false };
+      }
+    }
+    for (var r=5;r<8;r++){
+      for (var c=0;c<8;c++){
+        if ((r+c)%2===1) b[r][c] = { color:"r", king:false };
+      }
+    }
+    return b;
+  }
+  function ckInBounds(r,c){ return r>=0 && r<8 && c>=0 && c<8; }
+  function ckDirs(piece){
+    if (piece.king) return [[-1,-1],[-1,1],[1,-1],[1,1]];
+    return piece.color === "r" ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]];
+  }
+  function ckMovesForSquare(board, r, c){
+    var piece = board[r][c];
+    if (!piece) return { moves:[], captures:[] };
+    var moves = [], captures = [];
+    ckDirs(piece).forEach(function(d){
+      var nr=r+d[0], nc=c+d[1];
+      if (!ckInBounds(nr,nc)) return;
+      if (!board[nr][nc]){
+        moves.push({ r:nr, c:nc });
+      } else if (board[nr][nc].color !== piece.color){
+        var jr=nr+d[0], jc=nc+d[1];
+        if (ckInBounds(jr,jc) && !board[jr][jc]){
+          captures.push({ r:jr, c:jc, capR:nr, capC:nc });
+        }
+      }
+    });
+    return { moves:moves, captures:captures };
+  }
+  function ckAllMoves(board, color){
+    var allCaptures = [], allMoves = [];
+    for (var r=0;r<8;r++){
+      for (var c=0;c<8;c++){
+        var p = board[r][c];
+        if (!p || p.color !== color) continue;
+        var res = ckMovesForSquare(board, r, c);
+        res.captures.forEach(function(m){ allCaptures.push({ fr:r, fc:c, r:m.r, c:m.c, capR:m.capR, capC:m.capC }); });
+        res.moves.forEach(function(m){ allMoves.push({ fr:r, fc:c, r:m.r, c:m.c }); });
+      }
+    }
+    if (allCaptures.length > 0) return { captures:allCaptures, moves:[] };
+    return { captures:[], moves:allMoves };
+  }
+  // executes one step (move or capture) and returns { captured:bool, continued:bool }
+  function ckExecuteStep(board, fr, fc, tr, tc, capR, capC){
+    var piece = board[fr][fc];
+    board[tr][tc] = piece;
+    board[fr][fc] = null;
+    var captured = false;
+    if (capR !== undefined && capR !== null){
+      board[capR][capC] = null;
+      captured = true;
+    }
+    if (!piece.king){
+      if (piece.color === "r" && tr === 0) piece.king = true;
+      if (piece.color === "b" && tr === 7) piece.king = true;
+    }
+    var continued = false;
+    if (captured){
+      var further = ckMovesForSquare(board, tr, tc).captures;
+      continued = further.length > 0;
+    }
+    return { captured:captured, continued:continued };
+  }
+
+  var ckBoard = null;
+  var ckTurn = "r";
+  var ckSelected = null;
+  var ckActivePiece = null; // {r,c} when mid multi-jump
+  var ckGameOver = false;
+
+  function openCheckers(){
+    ckBoard = ckInitBoard();
+    ckTurn = "r";
+    ckSelected = null;
+    ckActivePiece = null;
+    ckGameOver = false;
+    document.getElementById("checkersResult").style.display = "none";
+    renderCheckersBoard();
+    updateCheckersStatus();
+  }
+
+  function ckPieceGlyph(piece){ return piece.king ? "K" : ""; }
+
+  function renderCheckersBoard(){
+    var boardEl = document.getElementById("checkersBoard");
+    boardEl.innerHTML = "";
+    var legal = null;
+    if (!ckGameOver && ckTurn === "r"){
+      legal = ckActivePiece
+        ? { captures: ckMovesForSquare(ckBoard, ckActivePiece.r, ckActivePiece.c).captures.map(function(m){ return { fr:ckActivePiece.r, fc:ckActivePiece.c, r:m.r, c:m.c, capR:m.capR, capC:m.capC }; }), moves:[] }
+        : ckAllMoves(ckBoard, "r");
+    }
+    var movableSquares = {};
+    var destForSelected = [];
+    if (legal){
+      var options = legal.captures.length > 0 ? legal.captures : legal.moves;
+      options.forEach(function(m){ movableSquares[m.fr+","+m.fc] = true; });
+      if (ckSelected){
+        options.forEach(function(m){
+          if (m.fr === ckSelected.r && m.fc === ckSelected.c) destForSelected.push(m);
+        });
+      }
+    }
+    var destMap = {};
+    destForSelected.forEach(function(m){ destMap[m.r+","+m.c] = m; });
+
+    for (var r=0;r<8;r++){
+      for (var c=0;c<8;c++){
+        var sq = document.createElement("div");
+        sq.className = "sq " + (((r+c)%2===0) ? "light" : "dark");
+        var piece = ckBoard[r][c];
+        var key = r+","+c;
+        if (piece){
+          var pEl = document.createElement("div");
+          pEl.className = "piece " + (piece.color === "b" ? "black" : "red");
+          pEl.textContent = ckPieceGlyph(piece);
+          sq.appendChild(pEl);
+        }
+        if (ckSelected && ckSelected.r===r && ckSelected.c===c) sq.classList.add("selected");
+        if (movableSquares[key] && !ckSelected) sq.classList.add("movable");
+        if (destMap[key]) sq.classList.add("targetable");
+        (function(rr,cc){
+          sq.addEventListener("click", function(){ handleCheckersClick(rr,cc); });
+        })(r,c);
+        boardEl.appendChild(sq);
+      }
+    }
+  }
+
+  function handleCheckersClick(r,c){
+    if (ckGameOver || ckTurn !== "r") return;
+    var legal = ckActivePiece
+      ? { captures: ckMovesForSquare(ckBoard, ckActivePiece.r, ckActivePiece.c).captures.map(function(m){ return { fr:ckActivePiece.r, fc:ckActivePiece.c, r:m.r, c:m.c, capR:m.capR, capC:m.capC }; }), moves:[] }
+      : ckAllMoves(ckBoard, "r");
+    var options = legal.captures.length > 0 ? legal.captures : legal.moves;
+
+    // clicking a destination for the currently selected piece
+    if (ckSelected){
+      var dest = options.find(function(m){ return m.fr===ckSelected.r && m.fc===ckSelected.c && m.r===r && m.c===c; });
+      if (dest){
+        var stepRes = ckExecuteStep(ckBoard, dest.fr, dest.fc, dest.r, dest.c, dest.capR, dest.capC);
+        if (stepRes.captured && stepRes.continued){
+          ckActivePiece = { r:dest.r, c:dest.c };
+          ckSelected = { r:dest.r, c:dest.c };
+        } else {
+          ckActivePiece = null;
+          ckSelected = null;
+          ckTurn = "b";
+        }
+        renderCheckersBoard();
+        if (checkCheckersGameOver()) return;
+        updateCheckersStatus();
+        if (ckTurn === "b"){
+          setTimeout(ckRobotTurn, 550);
+        }
+        return;
+      }
+    }
+    // selecting a movable piece
+    var hasOption = options.some(function(m){ return m.fr===r && m.fc===c; });
+    if (hasOption){
+      ckSelected = { r:r, c:c };
+      renderCheckersBoard();
+    }
+  }
+
+  function ckRobotTurn(){
+    if (ckGameOver) return;
+    var cur = { r:null, c:null };
+    var active = null;
+    var didAnything = true;
+    while (didAnything){
+      didAnything = false;
+      var legal = active
+        ? { captures: ckMovesForSquare(ckBoard, active.r, active.c).captures.map(function(m){ return { fr:active.r, fc:active.c, r:m.r, c:m.c, capR:m.capR, capC:m.capC }; }), moves:[] }
+        : ckAllMoves(ckBoard, "b");
+      var options = legal.captures.length > 0 ? legal.captures : legal.moves;
+      if (options.length === 0) break;
+      var pick = options[Math.floor(Math.random() * options.length)];
+      var stepRes = ckExecuteStep(ckBoard, pick.fr, pick.fc, pick.r, pick.c, pick.capR, pick.capC);
+      if (stepRes.captured && stepRes.continued){
+        active = { r:pick.r, c:pick.c };
+        didAnything = true;
+      } else {
+        active = null;
+        didAnything = false;
+      }
+    }
+    ckTurn = "r";
+    renderCheckersBoard();
+    if (checkCheckersGameOver()) return;
+    updateCheckersStatus();
+  }
+
+  function checkCheckersGameOver(){
+    var res = ckAllMoves(ckBoard, ckTurn);
+    var hasMoves = res.captures.length > 0 || res.moves.length > 0;
+    if (!hasMoves){
+      ckGameOver = true;
+      var winner = ckTurn === "r" ? "Robot" : "You";
+      showCheckersResult(winner);
+      return true;
+    }
+    return false;
+  }
+
+  function showCheckersResult(winner){
+    var box = document.getElementById("checkersResult");
+    var youWon = winner === "You";
+    box.innerHTML =
+      '<div class="result-headline' + (youWon ? ' perfect' : '') + '">' + (youWon ? "You win!" : "Robot wins") + '</div>' +
+      '<div class="result-sub">' + (youWon ? "The robot ran out of legal moves." : "You ran out of legal moves — try again.") + '</div>';
+    box.style.display = "block";
+  }
+
+  function updateCheckersStatus(){
+    if (ckGameOver) return;
+    document.getElementById("checkersStatus").innerHTML = ckTurn === "r"
+      ? "<b>Your move</b> — red pieces, moving up the board."
+      : "<b>Robot is thinking…</b>";
+  }
+
+  document.getElementById("checkersBackBtn").addEventListener("click", function(){ showPage("favoritesPage"); });
+  document.getElementById("checkersNewGameBtn").addEventListener("click", function(){ openCheckers(); });
+
   loadStore();
-  applyTheme(store.settings.theme || "dark");
+  ensureFavorites();
   renderFavorites();
 })();
 </script>
