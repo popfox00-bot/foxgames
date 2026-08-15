@@ -1185,8 +1185,8 @@
       var h = road.canvasH * 0.07;
       var greenDelta = randInt(1 + road.rngShift, 5 + road.rngShift);
       var redDelta = randInt(-5 + road.rngShift, -1 + road.rngShift);
-      road.obstacles.push({ type:"bonus", color: greenLeft ? "green" : "red", delta: greenLeft ? greenDelta : redDelta, x0:road.roadX0, x1:road.roadX0 + road.roadW/2, y:-h, h:h, resolved:false });
-      road.obstacles.push({ type:"bonus", color: greenLeft ? "red" : "green", delta: greenLeft ? redDelta : greenDelta, x0:road.roadX0 + road.roadW/2, x1:road.roadX1, y:-h, h:h, resolved:false });
+      road.obstacles.push(makeBonusDoor(greenLeft ? "green" : "red", greenLeft ? greenDelta : redDelta, road.roadX0, road.roadX0 + road.roadW/2, -h, h));
+      road.obstacles.push(makeBonusDoor(greenLeft ? "red" : "green", greenLeft ? redDelta : greenDelta, road.roadX0 + road.roadW/2, road.roadX1, -h, h));
     } else if (roll < 0.30 + 0.20){
       // power wall
       var pt = POWER_TYPES[Math.floor(Math.random() * POWER_TYPES.length)];
@@ -1201,35 +1201,66 @@
     }
   }
 
+  function makeBonusDoor(color, delta, x0, x1, y, h){
+    return { type:"bonus", color:color, delta:delta, x0:x0, x1:x1, y:y, h:h, resolved:false };
+  }
+  function colorForDelta(delta){
+    return delta > 0 ? "green" : delta < 0 ? "red" : "neutral";
+  }
+
   function roadOverlapY(obj){
     return obj.y + obj.h >= road.charY - road.charR && obj.y <= road.charY + road.charR;
   }
 
-  // Power-ups/downs last 5s each. Speed and Size are single-slot (a new pickup of that
-  // category replaces/refreshes the old one); Luck effects stack additively while active.
+  function spawnExtraWalls(count){
+    var laneW = road.roadW / 3;
+    for (var i = 0; i < count; i++){
+      var lane = Math.floor(Math.random() * 3);
+      var h = road.canvasH * 0.05;
+      road.obstacles.push({ type:"wall", x0:road.roadX0 + lane*laneW, x1:road.roadX0 + (lane+1)*laneW, y:-h - (i+1)*(road.canvasH*0.16), h:h });
+    }
+  }
+
+  // Instantly re-rolls every door currently on screen by shiftAmount, recoloring as needed
+  // (positive->green, negative->red, exactly 0->neutral/translucent).
+  function adjustExistingDoorDeltas(shiftAmount){
+    road.obstacles.forEach(function(o){
+      if (o.type === "bonus" && !o.resolved){
+        o.delta += shiftAmount;
+        o.color = colorForDelta(o.delta);
+      }
+    });
+  }
+
+  // Power-ups/downs last 7s each and genuinely stack: each pickup is its own timed entry,
+  // so two overlapping "2x Speed" pickups multiply to 4x until the earlier one expires.
   function applyRoadPower(kind){
     var pt = POWER_TYPES.filter(function(p){ return p.kind === kind; })[0];
-    if (kind === "speed2x" || kind === "speedHalf"){
-      road.activePowers = road.activePowers.filter(function(p){ return p.kind !== "speed2x" && p.kind !== "speedHalf"; });
+    road.activePowers.push({ kind:kind, label:pt.label, bad:pt.bad, expiresAt: road.elapsedMs + 7000 });
+    if (kind === "goodluck"){
+      adjustExistingDoorDeltas(2);
+      road.obstacles = road.obstacles.filter(function(o){ return o.type !== "wall"; });
     }
-    if (kind === "smaller" || kind === "larger"){
-      road.activePowers = road.activePowers.filter(function(p){ return p.kind !== "smaller" && p.kind !== "larger"; });
+    if (kind === "badluck"){
+      adjustExistingDoorDeltas(-2);
+      spawnExtraWalls(3);
     }
-    road.activePowers.push({ kind:kind, label:pt.label, bad:pt.bad, expiresAt: road.elapsedMs + 5000 });
     recomputeRoadPowers();
   }
 
   function recomputeRoadPowers(){
     road.activePowers = road.activePowers.filter(function(p){ return p.expiresAt > road.elapsedMs; });
-    var speedKind = null, sizeKind = null, luckShift = 0;
+    var speedMult = 1, sizeMult = 1, luckShift = 0;
     road.activePowers.forEach(function(p){
-      if (p.kind === "speed2x" || p.kind === "speedHalf") speedKind = p.kind;
-      if (p.kind === "smaller" || p.kind === "larger") sizeKind = p.kind;
+      if (p.kind === "speed2x") speedMult *= 2;
+      if (p.kind === "speedHalf") speedMult *= 0.5;
+      if (p.kind === "smaller") sizeMult *= 0.7;
+      if (p.kind === "larger") sizeMult *= 1.4;
       if (p.kind === "goodluck") luckShift += 2;
       if (p.kind === "badluck") luckShift -= 2;
     });
-    road.speedMultiplier = speedKind === "speed2x" ? 2 : speedKind === "speedHalf" ? 0.5 : 1;
-    road.sizeMultiplier = sizeKind === "smaller" ? 0.7 : sizeKind === "larger" ? 1.4 : 1;
+    road.speedMultiplier = speedMult;
+    road.sizeMultiplier = sizeMult;
     road.charR = road.baseCharR * road.sizeMultiplier;
     road.rngShift = luckShift;
   }
@@ -1271,8 +1302,33 @@
     road.obstacles = road.obstacles.filter(function(o){ return o.y <= road.canvasH + 40; });
   }
 
+  function drawSkullIcon(ctx, cx, cy, s, bgColor){
+    ctx.fillStyle = "#FFFFFF";
+    ctx.beginPath();
+    ctx.arc(cx, cy - s*0.15, s*0.38, 0, Math.PI*2);
+    ctx.fill();
+    var jw = s*0.5, jh = s*0.32, jy = cy + s*0.05;
+    ctx.beginPath();
+    ctx.moveTo(cx - jw/2, jy);
+    ctx.lineTo(cx + jw/2, jy);
+    ctx.lineTo(cx + jw/2 - s*0.06, jy + jh);
+    ctx.lineTo(cx - jw/2 + s*0.06, jy + jh);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = bgColor;
+    ctx.beginPath(); ctx.arc(cx - s*0.16, cy - s*0.15, s*0.11, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + s*0.16, cy - s*0.15, s*0.11, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - s*0.02);
+    ctx.lineTo(cx - s*0.05, cy + s*0.08);
+    ctx.lineTo(cx + s*0.05, cy + s*0.08);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   function drawSpikeWall(ctx, obj){
-    ctx.fillStyle = "#161616";
+    var bg = "#161616";
+    ctx.fillStyle = bg;
     ctx.fillRect(obj.x0, obj.y, obj.x1 - obj.x0, obj.h);
     var spikes = 6;
     var spikeW = (obj.x1 - obj.x0) / spikes;
@@ -1286,10 +1342,7 @@
     }
     ctx.closePath();
     ctx.fill();
-    ctx.font = "bold " + Math.round(obj.h*0.85) + "px -apple-system, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("💀", (obj.x0+obj.x1)/2, obj.y + obj.h*0.55);
+    drawSkullIcon(ctx, (obj.x0+obj.x1)/2, obj.y + obj.h*0.55, obj.h*0.85, bg);
   }
 
   function drawRoad(){
@@ -1327,11 +1380,12 @@
           ctx.fillText(obj.label, (obj.x0+obj.x1)/2, obj.y + obj.h/2);
         }
       } else {
-        ctx.globalAlpha = 0.55;
-        ctx.fillStyle = obj.color === "green" ? "#3EA35A" : "#D14343";
+        var boxFill = obj.color === "green" ? "#3EA35A" : obj.color === "red" ? "#D14343" : "#FFFFFF";
+        ctx.globalAlpha = obj.color === "neutral" ? 0.4 : 0.55;
+        ctx.fillStyle = boxFill;
         ctx.fillRect(obj.x0, obj.y, obj.x1 - obj.x0, obj.h);
         ctx.globalAlpha = 1;
-        ctx.fillStyle = "#FFFFFF";
+        ctx.fillStyle = obj.color === "neutral" ? "#333333" : "#FFFFFF";
         ctx.font = "bold " + Math.max(11, Math.round(road.roadW*0.05)) + "px -apple-system, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
