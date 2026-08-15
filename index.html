@@ -100,7 +100,9 @@
   .section-title{ font-size:14px; font-weight:800; margin:26px 2px 10px; }
   .highscore-row{ display:flex; align-items:center; justify-content:space-between; background:var(--panel); border-radius:14px; padding:14px 16px; margin-bottom:10px; box-shadow: inset 0 0 0 1px var(--rule); }
   .highscore-name{ font-size:13.5px; font-weight:700; }
-  .highscore-num{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:18px; font-weight:700; color:var(--accent); }
+  .highscore-stats{ display:flex; gap:18px; }
+  .highscore-num{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:18px; font-weight:700; color:var(--accent); text-align:center; }
+  .highscore-sublabel{ font-family:-apple-system, sans-serif; font-size:9.5px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.05em; margin-top:2px; }
 
   /* ---- shared game-page chrome (Best Move + Checkers) ---- */
   .top-bar{ display:flex; align-items:center; gap:12px; margin-bottom:18px; }
@@ -175,6 +177,14 @@
     touch-action:none;
   }
   #roadCanvas{ width:100%; height:100%; display:block; }
+  .road-timer{
+    position:absolute; top:10px; left:10px;
+    background:rgba(0,0,0,0.6); color:#fff;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size:13px; font-weight:700;
+    padding:5px 10px; border-radius:9px;
+    z-index:5; pointer-events:none;
+  }
   .road-overlay{
     position:absolute; inset:0;
     background:rgba(0,0,0,0.55);
@@ -306,6 +316,7 @@
     </div>
     <div class="road-wrap" id="roadWrap">
       <canvas id="roadCanvas"></canvas>
+      <div class="road-timer" id="roadTimer">0:00</div>
       <div class="road-overlay" id="roadOverlay">
         <div class="road-overlay-card">
           <div class="road-overlay-title" id="roadOverlayTitle">That One Ad</div>
@@ -342,7 +353,7 @@
   "use strict";
 
   var STORAGE_KEY = "foxGames";
-  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, checkersRecord: { wins:0, losses:0 } };
+  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, longestTimes: {}, checkersRecord: { wins:0, losses:0 } };
 
   function loadStore(){
     try{
@@ -352,6 +363,7 @@
         if (parsed && parsed.dailyLog) store = parsed;
         if (!store.settings) store.settings = { theme:"dark" };
         if (!store.highScores) store.highScores = {};
+        if (!store.longestTimes) store.longestTimes = {};
         if (!store.checkersRecord) store.checkersRecord = { wins:0, losses:0 };
       }
     }catch(e){}
@@ -361,6 +373,11 @@
   }
   function pad(n){ return n < 10 ? "0"+n : ""+n; }
   function todayStr(){ var d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+  function fmtTime(ms){
+    var totalSec = Math.floor(ms/1000);
+    var m = Math.floor(totalSec/60), s = totalSec%60;
+    return m + ":" + pad(s);
+  }
 
   // ================= THEME =================
   function applyTheme(theme){
@@ -503,11 +520,19 @@
     var anyScores = false;
     hsGames.forEach(function(g){
       var score = store.highScores[g.id];
-      if (score === undefined) return;
+      var time = store.longestTimes[g.id];
+      if (score === undefined && time === undefined) return;
       anyScores = true;
+      var statsHtml = "";
+      if (score !== undefined){
+        statsHtml += '<div class="highscore-num">'+score+'<div class="highscore-sublabel">High Score</div></div>';
+      }
+      if (time !== undefined){
+        statsHtml += '<div class="highscore-num">'+fmtTime(time)+'<div class="highscore-sublabel">Longest Time</div></div>';
+      }
       var row = document.createElement("div");
       row.className = "highscore-row";
-      row.innerHTML = '<div class="highscore-name">'+g.name+'</div><div class="highscore-num">'+score+'</div>';
+      row.innerHTML = '<div class="highscore-name">'+g.name+'</div><div class="highscore-stats">'+statsHtml+'</div>';
       hsList.appendChild(row);
     });
     if (!anyScores){
@@ -1083,13 +1108,13 @@
     running:false, gameOverFlag:false, animId:null, lastTime:0,
     canvasW:0, canvasH:0, roadX0:0, roadX1:0, roadW:0,
     charX:0, charY:0, charR:0, baseCharR:0, dragging:false,
-    number:1, maxNumber:1, obstacles:[], spawnTimer:0,
+    number:1, maxNumber:1, obstacles:[], spawnTimer:0, elapsedMs:0,
     difficulty:"easy", speedMultiplier:1, sizeMultiplier:1, rngShift:0
   };
 
   function roadEffectiveSpeed(){
     var diff = ROAD_DIFFICULTIES.filter(function(d){ return d.id === road.difficulty; })[0] || ROAD_DIFFICULTIES[0];
-    return ROAD_BASE_SPEED * diff.mult * road.speedMultiplier;
+    return road.canvasH * ROAD_BASE_SPEED * diff.mult * road.speedMultiplier;
   }
 
   function resizeCanvasRoad(){
@@ -1115,6 +1140,7 @@
     road.maxNumber = 1;
     road.obstacles = [];
     road.spawnTimer = 700;
+    road.elapsedMs = 0;
     road.speedMultiplier = 1;
     road.sizeMultiplier = 1;
     road.rngShift = 0;
@@ -1123,6 +1149,7 @@
     road.gameOverFlag = false;
     road.running = false;
     road.lastTime = 0;
+    document.getElementById("roadTimer").textContent = "0:00";
   }
 
   function randInt(min, max){
@@ -1254,6 +1281,8 @@
     if (!road.running) return;
     var dt = road.lastTime ? (ts - road.lastTime) : 16;
     road.lastTime = ts;
+    road.elapsedMs += dt;
+    document.getElementById("roadTimer").textContent = fmtTime(road.elapsedMs);
     road.spawnTimer -= dt;
     if (road.spawnTimer <= 0){ spawnRoadObject(); road.spawnTimer = 1000 + Math.random()*500; }
     updateRoadObstacles(dt);
@@ -1302,9 +1331,14 @@
     if (road.animId){ cancelAnimationFrame(road.animId); road.animId = null; }
     var prevBest = store.highScores.roadgame || 0;
     var isNewBest = road.maxNumber > prevBest;
-    if (isNewBest){ store.highScores.roadgame = road.maxNumber; saveStore(); }
+    if (isNewBest){ store.highScores.roadgame = road.maxNumber; }
+    var prevLongest = store.longestTimes.roadgame || 0;
+    var isNewLongest = road.elapsedMs > prevLongest;
+    if (isNewLongest){ store.longestTimes.roadgame = road.elapsedMs; }
+    if (isNewBest || isNewLongest) saveStore();
     var reasonText = reason === "wall" ? "You hit a wall." : "Your number dropped below 1.";
     var bestNow = store.highScores.roadgame || road.maxNumber;
+    var timeText = "Time: " + fmtTime(road.elapsedMs) + (isNewLongest ? " — new longest run!" : "");
 
     roadOverlayButtons.innerHTML = "";
     var row = document.createElement("div");
@@ -1323,7 +1357,7 @@
 
     showRoadOverlay(
       "Game Over",
-      reasonText + " Reached " + road.maxNumber + (isNewBest ? " — new high score!" : (" — best: " + bestNow)) + "."
+      reasonText + " Reached " + road.maxNumber + (isNewBest ? " — new high score!" : (" — best: " + bestNow)) + ". " + timeText
     );
   }
 
