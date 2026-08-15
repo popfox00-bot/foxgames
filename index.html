@@ -190,6 +190,15 @@
     padding:5px 10px; border-radius:9px;
   }
   .road-active-bar{ display:flex; flex-direction:column; gap:4px; }
+  .road-tier-popup{
+    position:absolute; top:38%; left:50%;
+    transform:translate(-50%,-50%) scale(0.8);
+    font-size:36px; font-weight:900; color:#fff;
+    text-shadow:0 3px 10px rgba(0,0,0,0.55);
+    opacity:0; pointer-events:none; z-index:8;
+    transition:opacity .3s ease, transform .3s ease;
+  }
+  .road-tier-popup.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
   .road-power-chip{
     align-self:flex-start;
     font-size:10.5px; font-weight:700; color:#fff;
@@ -334,6 +343,7 @@
         <div class="road-timer" id="roadTimer">0:00</div>
         <div class="road-active-bar" id="roadActiveBar"></div>
       </div>
+      <div class="road-tier-popup" id="roadTierPopup"></div>
       <div class="road-overlay" id="roadOverlay">
         <div class="road-overlay-card">
           <div class="road-overlay-title" id="roadOverlayTitle">That One Ad</div>
@@ -1103,6 +1113,8 @@
   var roadOverlayTitle = document.getElementById("roadOverlayTitle");
   var roadOverlaySub = document.getElementById("roadOverlaySub");
   var roadOverlayButtons = document.getElementById("roadOverlayButtons");
+  var roadTierPopupEl = document.getElementById("roadTierPopup");
+  var roadTierPopupTimeout = null;
 
   var ROAD_DIFFICULTIES = [
     { id:"easy", label:"Easy", mult:1 },
@@ -1126,12 +1138,14 @@
     canvasW:0, canvasH:0, roadX0:0, roadX1:0, roadW:0,
     charX:0, charY:0, charR:0, baseCharR:0, dragging:false,
     number:1, maxNumber:1, obstacles:[], spawnTimer:0, elapsedMs:0,
-    difficulty:"easy", speedMultiplier:1, sizeMultiplier:1, rngShift:0, activePowers:[]
+    difficulty:"easy", speedMultiplier:1, sizeMultiplier:1, rngShift:0, activePowers:[],
+    currentTier:0, lastTierNotified:0, lastDrainSecond:-1
   };
 
   function roadEffectiveSpeed(){
     var diff = ROAD_DIFFICULTIES.filter(function(d){ return d.id === road.difficulty; })[0] || ROAD_DIFFICULTIES[0];
-    return road.canvasH * ROAD_BASE_SPEED * diff.mult * road.speedMultiplier;
+    var tierSpeedMult = Math.pow(1.1, road.currentTier);
+    return road.canvasH * ROAD_BASE_SPEED * diff.mult * road.speedMultiplier * tierSpeedMult;
   }
 
   function resizeCanvasRoad(){
@@ -1162,6 +1176,9 @@
     road.sizeMultiplier = 1;
     road.rngShift = 0;
     road.activePowers = [];
+    road.currentTier = 0;
+    road.lastTierNotified = 0;
+    road.lastDrainSecond = -1;
     road.charR = road.baseCharR;
     road.charX = (road.roadX0 + road.roadX1) / 2;
     road.gameOverFlag = false;
@@ -1169,6 +1186,36 @@
     road.lastTime = 0;
     document.getElementById("roadTimer").textContent = "0:00";
     document.getElementById("roadActiveBar").innerHTML = "";
+    roadTierPopupEl.classList.remove("show");
+    if (roadTierPopupTimeout){ clearTimeout(roadTierPopupTimeout); roadTierPopupTimeout = null; }
+  }
+
+  function showTierPopup(text){
+    roadTierPopupEl.textContent = text;
+    roadTierPopupEl.classList.add("show");
+    if (roadTierPopupTimeout) clearTimeout(roadTierPopupTimeout);
+    roadTierPopupTimeout = setTimeout(function(){ roadTierPopupEl.classList.remove("show"); }, 1600);
+  }
+
+  // Every 30s: bumps the tier (triggers a popup + a permanent 1.1x speed compounding),
+  // and once tier >= 1, drains `tier` points off the player's number every real second.
+  function updateRoadTier(){
+    var currentSec = Math.floor(road.elapsedMs / 1000);
+    var tier = Math.floor(currentSec / 30);
+    road.currentTier = tier;
+
+    if (tier > road.lastTierNotified){
+      road.lastTierNotified = tier;
+      showTierPopup((tier * 30) + "s!");
+    }
+
+    if (currentSec > road.lastDrainSecond){
+      road.lastDrainSecond = currentSec;
+      if (tier >= 1){
+        road.number -= tier;
+        if (road.number < 1) triggerRoadGameOver("drain");
+      }
+    }
   }
 
   function randInt(min, max){
@@ -1180,11 +1227,18 @@
     var laneW = road.roadW / 3;
     var roll = Math.random();
     if (roll < 0.30){
-      // bonus door pair — each side's value is rolled now and locked in, so it can be shown on the door
+      // bonus door pair — each side's value is rolled now and locked in, so it can be shown on the door.
+      // Base 1-5 / -5..-1 range is scaled by the current tier's difficulty multiplier (25% per tier,
+      // rounded to a whole number) before the flat rngShift from any active Luck power is added.
       var greenLeft = Math.random() < 0.5;
       var h = road.canvasH * 0.07;
-      var greenDelta = randInt(1 + road.rngShift, 5 + road.rngShift);
-      var redDelta = randInt(-5 + road.rngShift, -1 + road.rngShift);
+      var tierMult = 1 + 0.25 * road.currentTier;
+      var gMin = Math.round(1 * tierMult) + road.rngShift;
+      var gMax = Math.round(5 * tierMult) + road.rngShift;
+      var rMin = Math.round(-5 * tierMult) + road.rngShift;
+      var rMax = Math.round(-1 * tierMult) + road.rngShift;
+      var greenDelta = randInt(gMin, gMax);
+      var redDelta = randInt(rMin, rMax);
       road.obstacles.push(makeBonusDoor(greenLeft ? "green" : "red", greenLeft ? greenDelta : redDelta, road.roadX0, road.roadX0 + road.roadW/2, -h, h));
       road.obstacles.push(makeBonusDoor(greenLeft ? "red" : "green", greenLeft ? redDelta : greenDelta, road.roadX0 + road.roadW/2, road.roadX1, -h, h));
     } else if (roll < 0.30 + 0.20){
@@ -1411,6 +1465,8 @@
     road.lastTime = ts;
     road.elapsedMs += dt;
     document.getElementById("roadTimer").textContent = fmtTime(road.elapsedMs);
+    updateRoadTier();
+    if (road.gameOverFlag) return;
     recomputeRoadPowers();
     renderActivePowersBar();
     road.spawnTimer -= dt;
@@ -1466,7 +1522,9 @@
     var isNewLongest = road.elapsedMs > prevLongest;
     if (isNewLongest){ store.longestTimes.roadgame = road.elapsedMs; }
     if (isNewBest || isNewLongest) saveStore();
-    var reasonText = reason === "wall" ? "You hit a wall." : "Your number dropped below 1.";
+    var reasonText = reason === "wall" ? "You hit a wall."
+      : reason === "drain" ? "The drain wore you down."
+      : "Your number dropped below 1.";
     var bestNow = store.highScores.roadgame || road.maxNumber;
     var timeText = "Time: " + fmtTime(road.elapsedMs) + (isNewLongest ? " — new longest run!" : "");
 
