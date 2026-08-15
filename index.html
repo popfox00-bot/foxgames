@@ -1139,7 +1139,7 @@
     charX:0, charY:0, charR:0, baseCharR:0, dragging:false,
     number:1, maxNumber:1, obstacles:[], spawnTimer:0, elapsedMs:0,
     difficulty:"easy", speedMultiplier:1, sizeMultiplier:1, rngShift:0, activePowers:[],
-    currentTier:0, lastTierNotified:0, lastDrainSecond:-1
+    wallSizeMultiplier:1, currentTier:0, lastTierNotified:0, drainTimer:null
   };
 
   function roadEffectiveSpeed(){
@@ -1175,10 +1175,11 @@
     road.speedMultiplier = 1;
     road.sizeMultiplier = 1;
     road.rngShift = 0;
+    road.wallSizeMultiplier = 1;
     road.activePowers = [];
     road.currentTier = 0;
     road.lastTierNotified = 0;
-    road.lastDrainSecond = -1;
+    road.drainTimer = null;
     road.charR = road.baseCharR;
     road.charX = (road.roadX0 + road.roadX1) / 2;
     road.gameOverFlag = false;
@@ -1197,11 +1198,20 @@
     roadTierPopupTimeout = setTimeout(function(){ roadTierPopupEl.classList.remove("show"); }, 1600);
   }
 
-  // Every 30s: bumps the tier (triggers a popup + a permanent 1.1x speed compounding),
-  // and once tier >= 1, drains `tier` points off the player's number every real second.
-  function updateRoadTier(){
+  // Drain schedule: tier 0 = none, tier 1 (30-59s) = 1pt every 2s,
+  // tier 2 (60-89s) = 1pt/s, tier 3+ = (tier-1)pts/s.
+  function drainConfigForTier(tier){
+    if (tier <= 0) return null;
+    if (tier === 1) return { interval:2000, amount:1 };
+    return { interval:1000, amount: tier - 1 };
+  }
+
+  // Every 30s: bumps the tier (popup + compounding 1.1x speed), and drives the drain
+  // cadence above. dt is the frame's delta time in ms.
+  function updateRoadTier(dt){
     var currentSec = Math.floor(road.elapsedMs / 1000);
     var tier = Math.floor(currentSec / 30);
+    var tierChanged = tier !== road.currentTier;
     road.currentTier = tier;
 
     if (tier > road.lastTierNotified){
@@ -1209,12 +1219,21 @@
       showTierPopup((tier * 30) + "s!");
     }
 
-    if (currentSec > road.lastDrainSecond){
-      road.lastDrainSecond = currentSec;
-      if (tier >= 1){
-        road.number -= tier;
-        if (road.number < 1) triggerRoadGameOver("drain");
-      }
+    var cfg = drainConfigForTier(tier);
+    if (!cfg){
+      road.drainTimer = null;
+      return;
+    }
+    if (road.drainTimer === null || tierChanged){
+      road.drainTimer = cfg.interval;
+    }
+    road.drainTimer -= dt;
+    var guard = 0;
+    while (road.drainTimer <= 0 && guard < 20){
+      road.number -= cfg.amount;
+      road.drainTimer += cfg.interval;
+      guard++;
+      if (road.number < 1){ triggerRoadGameOver("drain"); break; }
     }
   }
 
@@ -1223,24 +1242,83 @@
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
+  // ---- Luck stacking math ----
+  // 1 active Good/Bad Luck: flat +2 / -2 shift, as before.
+  // 2+ active of the SAME kind: instead of a bigger flat shift, positives/negatives get
+  // multiplied or divided (rounded), per the spec:
+  //  - 2+ Good Luck: positive doors x2 (tagged "x"), negative doors /2 (softened, not tagged)
+  //  - 2+ Bad Luck:  negative doors x2 (tagged "x"), positive doors /2 (softened, not tagged)
+  function countActiveLuck(){
+    var good = 0, bad = 0;
+    road.activePowers.forEach(function(p){
+      if (p.kind === "goodluck") good++;
+      if (p.kind === "badluck") bad++;
+    });
+    return { good:good, bad:bad };
+  }
+  function computeLuckDelta(rawDelta, goodCount, badCount){
+    if (goodCount >= 2 || badCount >= 2){
+      if (rawDelta > 0){
+        if (goodCount >= 2) return { delta: Math.round(rawDelta*2), doubled:true };
+        if (badCount >= 2)  return { delta: Math.round(rawDelta/2), doubled:false };
+      } else if (rawDelta < 0){
+        if (badCount >= 2)  return { delta: Math.round(rawDelta*2), doubled:true };
+        if (goodCount >= 2) return { delta: Math.round(rawDelta/2), doubled:false };
+      }
+      return { delta: rawDelta, doubled:false };
+    }
+    var shift = goodCount*2 - badCount*2;
+    return { delta: rawDelta + shift, doubled:false };
+  }
+  function applyLuckToDoor(door){
+    var counts = countActiveLuck();
+    var r = computeLuckDelta(door.rawDelta, counts.good, counts.bad);
+    door.delta = r.delta;
+    door.doubled = r.doubled;
+    door.color = colorForDelta(door.delta);
+  }
+  function refreshAllDoorsForLuck(){
+    road.obstacles.forEach(function(o){
+      if (o.type === "bonus" && !o.resolved) applyLuckToDoor(o);
+    });
+  }
+
+  function wallXRangeForLane(lane, sizeMult){
+    var laneW = road.roadW / 3;
+    var laneX0 = road.roadX0 + lane*laneW;
+    var laneCenter = laneX0 + laneW/2;
+    var halfW = (laneW * sizeMult) / 2;
+    return { x0: laneCenter - halfW, x1: laneCenter + halfW };
+  }
+  function refreshAllWallSizes(){
+    var counts = countActiveLuck();
+    var net = counts.good - counts.bad;
+    road.wallSizeMultiplier = net > 0 ? 0.5 : net < 0 ? 1.25 : 1;
+    road.obstacles.forEach(function(o){
+      if (o.type === "wall" && o.lane !== undefined){
+        var r = wallXRangeForLane(o.lane, road.wallSizeMultiplier);
+        o.x0 = r.x0; o.x1 = r.x1;
+      }
+    });
+  }
+
   function spawnRoadObject(){
     var laneW = road.roadW / 3;
     var roll = Math.random();
     if (roll < 0.30){
-      // bonus door pair — each side's value is rolled now and locked in, so it can be shown on the door.
-      // Base 1-5 / -5..-1 range is scaled by the current tier's difficulty multiplier (25% per tier,
-      // rounded to a whole number) before the flat rngShift from any active Luck power is added.
+      // bonus door pair — the raw (pre-luck) value is rolled and locked in at spawn;
+      // the displayed/applied delta is derived from that raw value plus whatever Luck
+      // powers are active right now, and gets refreshed live if Luck state changes.
       var greenLeft = Math.random() < 0.5;
       var h = road.canvasH * 0.07;
-      var tierMult = 1 + 0.25 * road.currentTier;
-      var gMin = Math.round(1 * tierMult) + road.rngShift;
-      var gMax = Math.round(5 * tierMult) + road.rngShift;
-      var rMin = Math.round(-5 * tierMult) + road.rngShift;
-      var rMax = Math.round(-1 * tierMult) + road.rngShift;
-      var greenDelta = randInt(gMin, gMax);
-      var redDelta = randInt(rMin, rMax);
-      road.obstacles.push(makeBonusDoor(greenLeft ? "green" : "red", greenLeft ? greenDelta : redDelta, road.roadX0, road.roadX0 + road.roadW/2, -h, h));
-      road.obstacles.push(makeBonusDoor(greenLeft ? "red" : "green", greenLeft ? redDelta : greenDelta, road.roadX0 + road.roadW/2, road.roadX1, -h, h));
+      var tierMult = 1 + 0.5 * road.currentTier;
+      var rawGreen = randInt(Math.round(1*tierMult), Math.round(5*tierMult));
+      var rawRed = randInt(Math.round(-5*tierMult), Math.round(-1*tierMult));
+      var doorA = { type:"bonus", rawDelta: greenLeft ? rawGreen : rawRed, x0:road.roadX0, x1:road.roadX0 + road.roadW/2, y:-h, h:h, resolved:false };
+      var doorB = { type:"bonus", rawDelta: greenLeft ? rawRed : rawGreen, x0:road.roadX0 + road.roadW/2, x1:road.roadX1, y:-h, h:h, resolved:false };
+      applyLuckToDoor(doorA);
+      applyLuckToDoor(doorB);
+      road.obstacles.push(doorA, doorB);
     } else if (roll < 0.30 + 0.20){
       // power wall
       var pt = POWER_TYPES[Math.floor(Math.random() * POWER_TYPES.length)];
@@ -1251,13 +1329,11 @@
       // plain hazard wall
       var lane2 = Math.floor(Math.random() * 3);
       var h3 = road.canvasH * 0.05;
-      road.obstacles.push({ type:"wall", x0:road.roadX0 + lane2*laneW, x1:road.roadX0 + (lane2+1)*laneW, y:-h3, h:h3 });
+      var wr = wallXRangeForLane(lane2, road.wallSizeMultiplier);
+      road.obstacles.push({ type:"wall", lane:lane2, x0:wr.x0, x1:wr.x1, y:-h3, h:h3 });
     }
   }
 
-  function makeBonusDoor(color, delta, x0, x1, y, h){
-    return { type:"bonus", color:color, delta:delta, x0:x0, x1:x1, y:y, h:h, resolved:false };
-  }
   function colorForDelta(delta){
     return delta > 0 ? "green" : delta < 0 ? "red" : "neutral";
   }
@@ -1266,57 +1342,34 @@
     return obj.y + obj.h >= road.charY - road.charR && obj.y <= road.charY + road.charR;
   }
 
-  function spawnExtraWalls(count){
-    var laneW = road.roadW / 3;
-    for (var i = 0; i < count; i++){
-      var lane = Math.floor(Math.random() * 3);
-      var h = road.canvasH * 0.05;
-      road.obstacles.push({ type:"wall", x0:road.roadX0 + lane*laneW, x1:road.roadX0 + (lane+1)*laneW, y:-h - (i+1)*(road.canvasH*0.16), h:h });
-    }
-  }
-
-  // Instantly re-rolls every door currently on screen by shiftAmount, recoloring as needed
-  // (positive->green, negative->red, exactly 0->neutral/translucent).
-  function adjustExistingDoorDeltas(shiftAmount){
-    road.obstacles.forEach(function(o){
-      if (o.type === "bonus" && !o.resolved){
-        o.delta += shiftAmount;
-        o.color = colorForDelta(o.delta);
-      }
-    });
-  }
-
   // Power-ups/downs last 7s each and genuinely stack: each pickup is its own timed entry,
   // so two overlapping "2x Speed" pickups multiply to 4x until the earlier one expires.
+  // Good/Bad Luck additionally re-derive every on-screen door and wall instantly.
   function applyRoadPower(kind){
     var pt = POWER_TYPES.filter(function(p){ return p.kind === kind; })[0];
     road.activePowers.push({ kind:kind, label:pt.label, bad:pt.bad, expiresAt: road.elapsedMs + 7000 });
-    if (kind === "goodluck"){
-      adjustExistingDoorDeltas(2);
-      road.obstacles = road.obstacles.filter(function(o){ return o.type !== "wall"; });
-    }
-    if (kind === "badluck"){
-      adjustExistingDoorDeltas(-2);
-      spawnExtraWalls(3);
+    if (kind === "goodluck" || kind === "badluck"){
+      refreshAllDoorsForLuck();
+      refreshAllWallSizes();
     }
     recomputeRoadPowers();
   }
 
   function recomputeRoadPowers(){
     road.activePowers = road.activePowers.filter(function(p){ return p.expiresAt > road.elapsedMs; });
-    var speedMult = 1, sizeMult = 1, luckShift = 0;
+    var speedMult = 1, sizeMult = 1;
     road.activePowers.forEach(function(p){
       if (p.kind === "speed2x") speedMult *= 2;
       if (p.kind === "speedHalf") speedMult *= 0.5;
       if (p.kind === "smaller") sizeMult *= 0.7;
       if (p.kind === "larger") sizeMult *= 1.4;
-      if (p.kind === "goodluck") luckShift += 2;
-      if (p.kind === "badluck") luckShift -= 2;
     });
     road.speedMultiplier = speedMult;
     road.sizeMultiplier = sizeMult;
     road.charR = road.baseCharR * road.sizeMultiplier;
-    road.rngShift = luckShift;
+    var counts = countActiveLuck();
+    road.rngShift = counts.good*2 - counts.bad*2; // kept for reference/back-compat only; doors use computeLuckDelta directly
+    refreshAllWallSizes();
   }
 
   function renderActivePowersBar(){
@@ -1440,11 +1493,12 @@
         ctx.fillRect(obj.x0, obj.y, obj.x1 - obj.x0, obj.h);
         ctx.globalAlpha = 1;
         ctx.fillStyle = obj.color === "neutral" ? "#333333" : "#FFFFFF";
-        ctx.font = "bold " + Math.max(11, Math.round(road.roadW*0.05)) + "px -apple-system, sans-serif";
+        ctx.font = "bold " + Math.max(10, Math.round(road.roadW*(obj.doubled ? 0.042 : 0.05))) + "px -apple-system, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         var sign = obj.delta > 0 ? "+" : "";
-        ctx.fillText(sign + obj.delta, (obj.x0+obj.x1)/2, obj.y + obj.h/2);
+        var label = (obj.doubled ? "x" : "") + sign + obj.delta;
+        ctx.fillText(label, (obj.x0+obj.x1)/2, obj.y + obj.h/2);
       }
     });
 
@@ -1465,7 +1519,7 @@
     road.lastTime = ts;
     road.elapsedMs += dt;
     document.getElementById("roadTimer").textContent = fmtTime(road.elapsedMs);
-    updateRoadTier();
+    updateRoadTier(dt);
     if (road.gameOverFlag) return;
     recomputeRoadPowers();
     renderActivePowersBar();
