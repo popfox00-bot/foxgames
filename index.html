@@ -165,6 +165,44 @@
   .result-again{ font-size:11.5px; color:var(--ink-soft); margin-top:12px; }
   .text-btn{ margin-top:14px; width:100%; border:none; background:var(--panel); color:var(--ink); font-weight:700; font-size:13px; padding:12px; border-radius:12px; cursor:pointer; box-shadow: inset 0 0 0 1px var(--rule); }
 
+  /* ---- Spelling Bee ---- */
+  .bee-score-row{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; }
+  .bee-score-num{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:30px; font-weight:700; color:var(--accent); }
+  .bee-score-label{ font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; font-weight:700; }
+  .bee-rank{ font-size:13px; font-weight:700; color:var(--ink-soft); }
+  .bee-word-display{
+    text-align:center; font-size:24px; font-weight:800; letter-spacing:0.04em;
+    text-transform:uppercase; min-height:34px; margin-bottom:6px;
+  }
+  .bee-message{ text-align:center; font-size:12.5px; font-weight:700; color:var(--accent); min-height:18px; margin-bottom:8px; }
+  .bee-hex-wrap{ position:relative; width:100%; max-width:300px; aspect-ratio:1; margin:0 auto 18px; }
+  .bee-cell{
+    position:absolute; width:31%; aspect-ratio:1.1547/1;
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+    display:flex; align-items:center; justify-content:center;
+    font-size:clamp(18px,6.2vw,26px); font-weight:800;
+    cursor:pointer; user-select:none; -webkit-user-select:none;
+  }
+  .bee-cell.center{ background:#F7C948; color:#3A2C00; }
+  .bee-cell.outer{ background:var(--panel-hi); color:var(--ink); box-shadow: inset 0 0 0 1px var(--rule); }
+  .bee-cell.outer:active{ background:var(--accent-soft); }
+  .bee-controls{ display:flex; gap:10px; margin-bottom:20px; }
+  .bee-ctrl-btn{
+    flex:1; border:none; background:var(--panel); color:var(--ink); font-weight:700; font-size:13px;
+    padding:13px 0; border-radius:12px; cursor:pointer; box-shadow: inset 0 0 0 1px var(--rule);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .bee-shuffle-btn{ flex:0 0 48px; }
+  .bee-enter-btn{ background:var(--accent); color:#fff; box-shadow:none; }
+  .bee-found-header{ font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-bottom:10px; }
+  .bee-found-list{ display:flex; flex-wrap:wrap; gap:8px; }
+  .bee-found-word{
+    background:var(--panel); box-shadow: inset 0 0 0 1px var(--rule); border-radius:8px;
+    padding:6px 10px; font-size:12px; font-weight:700; text-transform:uppercase;
+    color:var(--ink-soft); letter-spacing:0.02em;
+  }
+  .bee-found-word.pangram{ background:var(--accent-soft); color:var(--accent); }
+
   /* ---- That One Ad ---- */
   .road-wrap{
     position:relative;
@@ -354,6 +392,44 @@
     </div>
   </div>
 
+  <div id="spellingbeePage" class="page">
+    <div class="top-bar">
+      <button class="icon-btn" id="beeBackBtn" aria-label="Back">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+      </button>
+      <div>
+        <p class="eyebrow">Daily Puzzle</p>
+        <h1 style="margin-bottom:0;">Spelling Bee</h1>
+      </div>
+    </div>
+
+    <div class="bee-score-row">
+      <div>
+        <div class="bee-score-num" id="beeScore">0</div>
+        <div class="bee-score-label">points</div>
+      </div>
+      <div class="bee-rank" id="beeRank">Just Started</div>
+    </div>
+
+    <div class="bee-word-display" id="beeWordDisplay">&nbsp;</div>
+    <div class="bee-message" id="beeMessage"></div>
+
+    <div class="bee-hex-wrap" id="beeHexWrap"></div>
+
+    <div class="bee-controls">
+      <button class="bee-ctrl-btn" id="beeDeleteBtn">Delete</button>
+      <button class="bee-ctrl-btn bee-shuffle-btn" id="beeShuffleBtn" aria-label="Shuffle">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+      </button>
+      <button class="bee-ctrl-btn bee-enter-btn" id="beeEnterBtn">Enter</button>
+    </div>
+
+    <div class="bee-found-header">
+      <span id="beeFoundCount">0 words found</span>
+    </div>
+    <div class="bee-found-list" id="beeFoundList"></div>
+  </div>
+
   <div class="tab-bar">
     <button class="tab-btn active" id="tabFavorites" data-page="favoritesPage">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.9 6.4.6-4.8 4.3 1.4 6.2L12 16.9 6.4 20l1.4-6.2L3 9.5l6.4-.6L12 3z"></path></svg>
@@ -431,6 +507,9 @@
     },
     { id:"roadgame", name:"That One Ad", page:"roadPage", defaultFavorite:false, icon:
       '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3L7 21"/><path d="M15 3l2 18"/><path d="M11 8h2M10.5 13h3M10 18h4"/></svg>'
+    },
+    { id:"spellingbee", name:"Spelling Bee", page:"spellingbeePage", defaultFavorite:false, icon:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,3 19,7 19,15 12,19 5,15 5,7"/><circle cx="12" cy="11" r="2.4" fill="white" stroke="none"/></svg>'
     }
   ];
   function ensureFavorites(){
@@ -447,7 +526,7 @@
   }
 
   // ================= NAVIGATION =================
-  var pages = ["favoritesPage","newGamesPage","statsPage","settingsPage","chessPage","checkersPage","roadPage"];
+  var pages = ["favoritesPage","newGamesPage","statsPage","settingsPage","chessPage","checkersPage","roadPage","spellingbeePage"];
   function showPage(id){
     pages.forEach(function(p){ document.getElementById(p).classList.toggle("active", p===id); });
     ["tabFavorites","tabNewGames","tabStats","tabSettings"].forEach(function(t){
@@ -467,6 +546,7 @@
     if (g.id === "chess") openChess();
     else if (g.id === "checkers") openCheckers();
     else if (g.id === "roadgame") openRoadGame();
+    else if (g.id === "spellingbee") openSpellingBee();
   }
 
   // ================= FAVORITES / NEW GAMES (shared heart-tile rendering) =================
@@ -542,7 +622,8 @@
     var hsList = document.getElementById("highScoreList");
     hsList.innerHTML = "";
     var hsGames = [
-      { id:"roadgame", name:"That One Ad" }
+      { id:"roadgame", name:"That One Ad" },
+      { id:"spellingbee", name:"Spelling Bee" }
     ];
     var anyScores = false;
     hsGames.forEach(function(g){
@@ -1636,6 +1717,180 @@
       resizeCanvasRoad();
       drawRoad();
     }
+  });
+
+
+  // ================= SPELLING BEE ENGINE =================
+  // 60 daily puzzles, each dictionary-validated offline (built from a real English
+  // word list) with a guaranteed pangram and at least 2 vowels among the 7 letters.
+  var BEE_PUZZLES = [{"center":"o","others":["e","h","m","n","r","w"],"words":["error","hero","heron","home","homeowner","homer","homeroom","hone","honor","hormone","horn","horror","memo","meow","mono","moon","moor","more","morn","moron","morrow","mower","mown","neon","none","noon","norm","nowhere","omen","owner","renown","room","roomer","rower","whereon","whom","whore","women","wooer","wore","worm","worn"]},{"center":"e","others":["c","d","n","o","v","y"],"words":["cede","ceded","cocooned","codded","code","coded","coed","concede","conceded","condone","condoned","cone","conned","convene","convened","convey","conveyed","convoyed","cooed","cove","coven","covey","dded","decency","decode","decoded","decoy","decoyed","deed","deeded","deny","done","donned","dove","doyen","dyed","eddy","encode","encoded","ended","envoy","envy","even","evened","eyed","need","needed","needy","neocon","neon","nodded","node","nonce","none","once","oven","vend","vended","voodooed"]},{"center":"s","others":["c","i","l","m","r","u"],"words":["circus","cirrus","crisis","culls","cums","cumulus","curls","curriculums","curs","cuss","ills","illus","iris","isms","lulls","mills","mils","mimics","misc","miss","mucus","mulls","murmurs","music","musics","muss","muumuus","rills","rims","rums","scull","sculls","scum","scums","sics","sill","sills","sims","sirs","slim","slims","slum","slums","slur","slurs","sums"]},{"center":"n","others":["b","c","g","i","m","o"],"words":["binging","bingo","binning","bionic","bobbin","bobbing","bogging","bogon","bombing","bonbon","bong","bonging","bongo","boning","boobing","booing","booming","boon","cocoon","cocooning","coin","coining","combing","combining","coming","common","conic","conning","cooing","coon","gibbon","gibing","gigging","ginning","gobbing","going","gong","gonging","goon","icing","icon","imbibing","incing","incoming","inning","miming","mincing","mini","minim","mining","minion","mobbing","mono","mooing","moon","mooning","nimbi","noggin","noncom","noon","oncoming","ongoing","onion"]},{"center":"e","others":["a","f","n","o","p","r"],"words":["aeon","appear","area","arena","earn","earner","error","fanfare","fare","fear","fern","fore","forenoon","free","freer","nape","near","nearer","neon","neoprene","none","nope","offer","open","opener","opera","paean","pane","paper","pare","pear","peep","peeper","peer","pennon","peon","pepper","pone","poorer","pope","pore","preen","prefer","prep","prepare","profane","proffer","prone","propane","proper","properer","rape","rapper","rare","rarer","reap","reaper","reappear","rear","reef","reefer","refer","referee","reopen","reproof","reran","roofer","rope"]},{"center":"s","others":["c","e","i","k","m","y"],"words":["ekes","emcees","eyes","ices","isms","keys","kicks","kiss","kisses","memes","mess","messes","messy","mickeys","mikes","mimes","mimics","misc","miss","misses","secs","secy","seek","seeks","seem","seems","sees","seismic","semi","semis","sick","sicks","sics","sims","sises","sissies","sissy","skies","skim","skims","skis","yeses"]},{"center":"i","others":["c","g","h","n","t","u"],"words":["chic","chichi","chin","chinning","chit","chitin","chugging","cinch","cinching","citing","cuing","cunning","cutting","gigging","ginning","gunning","gutting","high","hing","hinging","hint","hinting","hitch","hitching","hitting","hugging","hunching","hunting","icing","igniting","inch","inching","incing","inciting","inning","intuit","intuiting","itch","itching","nigh","night","ninth","nutting","thigh","thin","thing","thinning","tight","ting","tinging","tinning","tint","tinting","tithing","tugging","tunic","tuning","unhinging","unhitch","unhitching","unit","uniting"]},{"center":"e","others":["d","i","n","o","u","z"],"words":["dded","deed","deeded","denied","denizen","denude","denuded","died","dine","dined","dinned","diode","dizzied","done","donned","doze","dozed","dozen","dude","duded","dune","dunned","eddied","ended","endue","endued","ennui","indeed","indue","indued","innuendo","iodine","iodize","iodized","ionize","ionized","need","needed","neon","nine","nodded","node","none","nude","ooze","oozed","ozone","undone","undue","unionize","unionized","unneeded","zenned","zone","zoned"]},{"center":"o","others":["a","d","i","n","p","r"],"words":["adorn","airdrop","andiron","android","anion","anon","apron","ardor","dado","dodo","donor","doodad","door","droid","droop","drop","indoor","inroad","ipod","iron","noon","odor","onion","opinion","opioid","ordain","paranoia","paranoid","pardon","piano","pinion","podia","pond","poniard","poop","poor","poppa","porn","porno","prior","prod","pron","prop","radio","radon","raindrop","road","roan","roar","rood"]},{"center":"e","others":["c","f","l","s","u","y"],"words":["cell","cells","clef","clefs","clue","clueless","clues","cues","cusses","cycle","cycles","eels","ells","else","eyeful","eyefuls","eyes","feces","feel","feels","fees","fell","fells","flee","fleece","fleeces","fleecy","flees","flue","flues","fuel","fuels","fuse","fuses","fusses","lees","less","lessee","lessees","scuffle","scuffles","secs","secy","sees","self","selfless","selflessly","sell","sells","slue","slues","success","successes","successful","successfully","sues","suffuse","suffuses","useful","usefully","useless","uselessly","uses","yell","yells","yeses","yule"]},{"center":"l","others":["d","i","o","r","s","y"],"words":["dill","dills","dilly","doily","doll","dolls","dolly","drill","drills","drily","droll","drolly","drool","drools","dryly","idly","idol","idols","idyl","idyll","idylls","idyls","ills","lids","lily","loll","lolls","lord","lordly","lords","lorry","loss","oddly","oils","oily","rill","rills","roil","roils","roll","rolls","rosily","sill","sills","silly","silo","silos","slid","slily","slyly","soil","soils","sold","soli","solid","solidly","solids","solo","solos","sols","sordidly"]},{"center":"n","others":["a","b","d","g","o","w"],"words":["abandon","anon","baboon","banana","band","bandana","bandanna","bandwagon","bang","bogon","bonbon","bond","bong","bongo","boon","dawn","down","gang","gnaw","gnawn","gonad","gong","gonna","goon","gown","nabob","noon","wagon","wand","wanna"]},{"center":"r","others":["a","e","f","g","o","v"],"words":["afar","agar","agree","area","aver","average","eager","eagerer","ergo","error","ever","fare","favor","fear","fervor","fever","fora","forage","forager","fore","forego","forever","forgave","forge","forger","forgo","frag","free","freer","frog","garage","gear","gofer","gore","gorge","grave","graver","grog","groove","grove","offer","ogre","over","overage","overeager","raga","rage","rare","rarer","ravage","rave","rear","reef","reefer","reeve","refer","referee","reggae","reorg","revere","roar","roger","roof","roofer","rove","rover","veer","verge","verve"]},{"center":"e","others":["f","i","r","t","u","x"],"words":["eerie","eerier","effete","exert","exit","feet","ferret","fetter","fief","fierier","fife","fire","fitter","fixer","fixture","free","freer","fret","frier","fritter","fruitier","furrier","future","iffier","reef","reefer","refer","referee","refit","refute","retire","retiree","rife","rifer","rite","teeter","terrier","text","texture","tier","tire","titter","tree","trite","triter","true","truer","turret","uteri","utter","xref"]},{"center":"a","others":["l","o","r","t","v","y"],"words":["allay","allot","alloy","ally","altar","alto","aorta","array","arroyo","arty","atoll","attar","atty","avatar","larva","larval","lava","lavatory","loyal","loyally","loyalty","oral","orally","orator","oratory","oval","ovary","rally","ratty","roar","rotary","royal","royally","royalty","tall","tally","taro","tarot","tarry","tart","tartar","tartly","tattoo","tatty","total","totally","tray","valor","vary","votary"]},{"center":"s","others":["a","i","l","n","r","u"],"words":["ails","airs","alas","alias","annals","annuals","annuls","anus","arias","assail","assails","assassin","assassins","assn","auras","ills","illus","inns","insular","insulin","iris","lairs","lass","liars","liras","luaus","lulls","nails","nasal","nasals","nulls","nuns","rails","rains","raisin","raisins","rills","ruins","runs","sail","sails","salsa","salsas","sans","sari","saris","sass","sauna","saunas","sill","sills","sins","sinus","sirs","sisal","slain","slur","slurs","snail","snails","snarl","snarls","suns","ulnas","unsnarl","unsnarls","unusual","urinals","urns","usual"]},{"center":"r","others":["e","f","g","m","n","o"],"words":["emerge","engorge","ergo","error","fern","fore","forego","foregone","foremen","forenoon","forge","forger","forgo","forgone","form","former","free","freemen","freer","frog","frogmen","from","genre","germ","gofer","goner","gore","gorge","green","greener","grog","groom","mere","merge","merger","mermen","monger","moor","more","morn","moron","norm","offer","ogre","reef","reefer","reemerge","refer","referee","reform","reformer","renege","reorg","roger","roof","roofer","room","roomer"]},{"center":"l","others":["a","b","e","m","o","v"],"words":["able","abloom","aloe","amble","babble","babel","bale","ball","balm","bell","belle","bevel","blab","blame","blammo","blob","bloom","bobble","bola","bole","boll","embalm","emblem","evolve","label","lama","lamb","lame","lava","leave","lemma","lemme","levee","level","llama","loam","lobe","loll","loom","lovable","love","loveable","male","mall","malleable","mammal","meal","mole","moll","movable","moveable","oleo","oval","vale","valve","veal","vole"]},{"center":"s","others":["c","e","h","k","p","u"],"words":["checks","checkups","cheeks","cheeps","cheese","cheeses","chess","chucks","cues","cups","cusp","cusps","cuss","cusses","ekes","hues","hush","hushes","husk","husks","keeps","pecks","pecs","peeks","peeps","pees","peps","pucks","pukes","pups","push","pushes","pushup","pushups","puss","pusses","schuss","schusses","secs","seek","seeks","seep","seeps","sees","sheep","shes","shuck","shucks","shuckses","shush","shushes","spec","speck","specks","specs","speech","speeches","success","successes","such","suck","sucks","sues","sups","upchucks","uses"]},{"center":"i","others":["d","g","l","n","t","u"],"words":["dding","diddling","digging","digit","dill","diluting","ding","dinging","dining","dinning","dint","duding","dulling","dunging","dunning","gigging","giggling","gild","gilding","gill","gilt","ginning","gliding","glint","glinting","gluing","glutting","guiding","guild","guilt","gulling","gunning","gutting","idling","igniting","induing","indulging","inning","intuit","intuiting","lilt","lilting","lining","lint","linting","lugging","lulling","lunging","niggling","nudging","nutting","tiding","tiling","till","tilling","tilt","tilting","ting","tinging","tingling","tinning","tint","tinting","titling","tugging","tuning","undid","unit","uniting","until"]},{"center":"i","others":["d","k","l","n","u","y"],"words":["dill","dilly","dink","dinky","idly","idyl","idyll","inky","kiddy","kill","kiln","kind","kindly","kink","kinky","lily","link","ninny","undid","unkind","unkindly"]},{"center":"l","others":["a","e","i","t","v","z"],"words":["alit","alive","alleviate","avail","azalea","elate","elevate","elite","evil","late","latte","lava","laze","leave","levee","level","levitate","lilt","lite","little","live","lvii","tail","tale","tall","tattle","tattletale","teal","teazel","teazle","tell","telltale","tile","till","tilt","titillate","title","tittle","vale","valet","valve","veal","veil","velvet","vial","vile","villa","vital","vitalize","zeal"]},{"center":"m","others":["a","b","c","e","k","o"],"words":["abeam","acme","ameba","amebae","ammo","amoeba","amoebae","amok","bamboo","beam","became","become","bomb","boom","came","cameo","coma","comb","combo","come","comeback","comm","comma","emcee","kaboom","mace","make","mama","mambo","mamma","mecca","meek","meme","memo","mock","momma"]},{"center":"e","others":["c","i","l","s","v","z"],"words":["cell","celli","cells","civies","civilize","civilizes","civvies","eels","ells","else","elves","eves","evil","evils","ices","icicle","icicles","isle","isles","ivies","lees","leis","less","lessee","lessees","levee","levees","level","levels","levies","lice","lies","lilies","lisle","live","lives","secs","sees","seize","seizes","sell","sells","selves","sieve","sieves","sillies","sises","sissies","size","sizes","sizzle","sizzles","sleeve","sleeveless","sleeves","slice","slices","veil","veils","vesicle","vesicles","vessel","vessels","vice","vices","vies","vile","vise","vises"]},{"center":"s","others":["d","g","i","r","t","u"],"words":["digits","digs","disgust","disgusts","diss","distrust","distrusts","druggist","druggists","drugs","druids","duds","dust","dusts","gigs","girds","girts","gist","grids","grist","grits","gurus","gust","gusts","guts","iris","rids","rigs","rugs","rust","rusts","ruts","sirs","sits","situ","stir","stirs","strut","struts","stud","studs","suds","suit","suits","tits","truss","trust","trusts","tugs","turds","tutus"]},{"center":"i","others":["b","e","f","l","n","x"],"words":["beeline","belie","belief","bible","biff","bile","bill","elfin","exile","feline","fief","fife","file","fill","fine","flexible","ibex","infix","inflexible","inline","libel","lief","lien","life","lifeline","line","linen","lxii","lxix","nibble","nine","xiii","xxii","xxiii","xxix","xxxi","xxxii","xxxiii","xxxix"]},{"center":"t","others":["a","c","i","o","r","u"],"words":["acct","actor","actuator","aorta","arctic","atria","attar","attic","attract","auto","autocrat","autocratic","cacti","carat","carrot","cart","cataract","circuit","citric","coat","coot","court","critic","curator","curt","cutout","iota","orator","oratorio","ratio","ricotta","riot","root","rotor","rout","tacit","taco","tact","tactic","taro","tarot","tart","tartar","tattoo","taut","tiara","tiro","toot","tort","tour","tout","tract","tractor","trait","traitor","trio","trot","trout","tutor","tutu"]},{"center":"g","others":["f","i","n","o","r","v"],"words":["fining","firing","fogging","forging","forgiving","forgo","forgoing","fringing","frog","frogging","gigging","ginning","giving","going","gong","gonging","goof","goofing","goon","gorging","goring","griffin","grin","gringo","grinning","grog","groin","grooving","ignoring","infringing","inning","ironing","noggin","offing","ongoing","origin","riffing","rigging","rigor","ring","ringing","roofing","roving","vigor","virgin"]},{"center":"a","others":["e","k","l","m","r","y"],"words":["aery","alarm","allay","alley","ally","ameer","area","army","array","earl","early","earmark","kale","karma","kayak","lake","lama","lame","lamely","lamer","lark","layer","leak","leaky","lemma","llama","make","maker","malarkey","male","mall","mama","mamma","mammal","mammary","mare","mark","marker","marry","meal","mealy","merrymaker","mkay","rake","rally","rare","rarely","rarer","real","realer","really","realm","ream","reamer","rear","rearm","relay","remake","remark","remarry","yammer","year","yearly"]},{"center":"a","others":["c","e","f","l","m","p"],"words":["acme","aflame","alfalfa","alpaca","ample","apace","appal","appall","appeal","apple","calf","call","calm","came","camel","camp","cape","clam","clamp","clap","efface","face","facepalm","faecal","fall","fame","fecal","female","flame","flap","flea","lace","lama","lame","lamp","lapel","leaf","leap","lemma","llama","mace","male","mall","mama","mamma","mammal","maple","meal","mecca","pace","palace","pale","paleface","pall","palm","papa","papal","peace","peal","place","plea"]},{"center":"n","others":["a","c","g","i","o","x"],"words":["acing","again","aging","angina","anion","anon","axing","axon","caging","cancan","caning","canning","cannon","cannoning","canon","coaxing","cocoon","cocooning","cognac","coin","coining","conga","congaing","conic","conning","cooing","coon","gagging","gaging","gain","gaining","gang","ganging","gigging","ginning","going","gong","gonging","gonna","goon","icing","icon","incing","inning","nagging","niacin","nigga","nixing","noggin","noon","ongoing","onion"]},{"center":"n","others":["d","g","i","m","p","u"],"words":["dding","digging","dimming","ding","dinging","dining","dinning","dipping","duding","dumping","dung","dunging","dunning","duping","gigging","ginning","guiding","gumming","gunning","impinging","impugn","impugning","induing","inning","miming","mind","minding","mini","minim","minimum","mining","mugging","mung","munging","nipping","nudging","pidgin","pigging","piing","pimping","ping","pinging","pining","pinning","pinup","piping","pippin","pipping","pudding","pumping","punning","pupping","umping","undid","unpin","unpinning","upping"]},{"center":"o","others":["a","g","h","p","r","t"],"words":["agog","aorta","argot","atop","goat","goop","gorp","gotta","grog","grotto","hoop","hoorah","hoot","horror","oath","orator","parrot","pharaoh","photo","photograph","pooh","poop","poor","poppa","port","potato","prop","rapport","roar","root","rotor","taproot","taro","tarot","tattoo","throat","toga","toot","tooth","torpor","tort","troop","trot","troth"]},{"center":"d","others":["e","f","i","o","t","u"],"words":["dded","deed","deeded","defied","deft","deified","died","diet","dieted","diff","diffed","diode","ditto","dittoed","dodo","doff","doffed","dote","doted","dotted","dude","duded","duet","duff","eddied","edified","edit","edited","feed","feted","fetid","feud","feuded","fitted","food","footed","idiot","offed","outdid","outdo","outed","outfitted","teed","tide","tided","tidied","tied","tiffed","toed","tooted","toted","totted","touted","tufted"]},{"center":"e","others":["c","l","r","t","u","y"],"words":["celery","cell","clue","clutter","creel","cruel","crueler","crueller","cruelly","cruelty","cruet","cruller","culture","cure","curer","curler","curlycue","curter","cute","cutely","cuter","cutlery","cutlet","cutter","cycle","ecru","eery","elect","erect","erectly","eyelet","lecture","lecturer","leer","leery","letter","lettuce","lucre","lure","lute","lyre","recur","recycle","reel","reelect","rely","retell","retry","rule","ruler","teeter","tell","teller","terry","tree","truce","true","truer","tulle","turret","turtle","ulcer","utter","utterly","yell","yule"]},{"center":"r","others":["a","c","e","i","n","u"],"words":["accrue","acre","aerie","airier","arcane","area","arena","aria","aura","aurae","cairn","cancer","cannier","care","careen","career","carrier","circa","crane","crania","crier","cure","curer","curie","earn","earner","ecru","eerie","eerier","enure","icier","inaner","incur","inner","inure","nacre","narc","near","nearer","nicer","race","racer","racier","rain","rainier","rare","rarer","rear","recur","recurrence","rein","reran","rerun","rice","ruin","rune","runic","runner","runnier","uncannier","urea","uric","urine"]},{"center":"e","others":["a","c","h","k","p","y"],"words":["ache","apace","cache","cake","cape","cheap","check","cheek","cheeky","cheep","each","hake","heap","heck","hype","keep","pace","paycheck","payee","peace","peach","peak","peck","peek","peep","peppy","yeah"]},{"center":"a","others":["c","i","m","n","r","u"],"words":["acacia","airman","amir","aria","aura","cairn","cancan","circa","cram","crania","cranium","imam","maim","main","mama","mamma","mania","maniac","manic","manna","maraca","maria","marina","mica","micra","minicam","minima","narc","niacin","rain","unman","uranium"]},{"center":"l","others":["a","e","f","t","u","y"],"words":["alfalfa","allay","alley","ally","elate","eyeful","eyelet","fall","fatal","fatally","fateful","fatefully","fault","faulty","fealty","feel","fell","felt","fetal","fettle","flat","flatfeet","flatly","flay","flea","flee","fleet","flue","fluff","fluffy","flute","flyleaf","fuel","full","fully","late","lately","latte","layette","leaf","leaflet","leafy","left","lefty","luau","lull","lute","tale","tall","tally","tattle","tattletale","tautly","teal","tell","telltale","tulle","ululate","yell","yule"]},{"center":"s","others":["i","m","o","p","u","y"],"words":["impious","imps","isms","miss","moms","moos","mops","moss","mossy","mousy","mumps","muss","mussy","muumuus","oops","opossum","opossums","opus","osmosis","pimps","pious","pips","piss","pompoms","pompous","poops","pops","poss","possum","possums","posy","pumps","pups","puss","pussy","sims","sips","sissy","soppy","sops","soup","soups","soupy","sumo","sump","sumps","sums","sups","symposium","symposiums","sysop","sysops","umps","yips","yous","yups"]},{"center":"r","others":["e","g","m","o","t","y"],"words":["eery","egret","emerge","emery","ergo","error","geometer","geometry","germ","gore","gorge","gory","greet","grey","greyer","grog","groggy","grommet","groom","grotto","gyro","memory","mere","merge","merger","merry","meteor","meter","metro","moor","more","motor","ogre","orgy","otter","reemerge","regret","remote","remoter","reorg","retort","retry","roger","room","roomer","roomy","root","rooter","rote","rotor","teeter","term","terror","terry","tore","tort","torte","totter","tree","tremor","trot","trotter","troy","tyro","yore"]},{"center":"e","others":["b","c","p","r","t","u"],"words":["beep","beeper","beer","beet","beret","better","brute","butte","butter","buttercup","creep","creeper","crepe","crept","cruet","cube","cure","curer","curter","cute","cuter","cutter","ecru","erect","erupt","peep","peeper","peer","pepper","pert","perter","perturb","peter","precept","prep","puppet","puppeteer","pure","puree","purer","putter","rebut","recur","repute","rubber","rube","rupee","rupture","teepee","teeter","tepee","tree","truce","true","truer","tube","tuber","turret","upper","uppercut","utter"]},{"center":"e","others":["b","c","f","l","t","u"],"words":["beef","beet","beetle","befell","bell","belle","belt","blue","bluebell","bubble","buffet","bullet","butte","cell","clef","cleft","clubfeet","clue","cube","cute","cutlet","effect","effete","elect","feeble","feel","feet","fell","felt","fettle","flee","fleece","fleet","flue","flute","fuel","left","lettuce","lube","lute","tell","tube","tulle"]},{"center":"s","others":["b","c","e","i","o","x"],"words":["bees","bibs","bobbies","bobs","boobies","boobs","boos","boss","bosses","boxes","cobs","coccis","coos","cosies","ebbs","excess","excesses","excise","excises","execs","exes","ibexes","ibices","ibis","ibises","iceboxes","ices","obese","oboes","obsess","obsesses","secs","sees","sexes","sics","sises","sissies","sixes","sobs"]},{"center":"i","others":["g","h","m","n","p","u"],"words":["gigging","ginning","gumming","gunning","high","hing","hinging","hipping","hugging","humming","humping","impinging","impugn","impugning","inning","miming","mini","minim","minimum","mining","mugging","munging","nigh","nipping","pigging","piing","pimp","pimping","ping","pinging","pining","pinning","pinup","piping","pippin","pipping","pumping","punning","pupping","umping","unhinging","unpin","unpinning","upping"]},{"center":"e","others":["h","l","n","o","p","t"],"words":["elope","entente","heel","hell","hellhole","hello","helot","help","hole","hone","hope","hotel","lent","lept","lone","loophole","lope","neon","nettle","noel","none","nope","note","oleo","open","opponent","peel","peep","peephole","pellet","pelt","pennon","pent","peon","people","phone","poet","pole","pollen","pone","pope","potent","pothole","teen","teepee","teeth","teethe","telephone","telephoto","telethon","tell","telnet","tenet","tenon","tent","tenth","tepee","thee","then","tone","tonne","topple","tote"]},{"center":"l","others":["c","e","i","o","t","v"],"words":["cell","celli","cello","civil","clii","clit","clot","clove","clvi","clvii","coil","colic","collect","collective","collie","colt","cool","coolie","eclectic","elect","elective","elicit","elite","evil","evolve","icicle","illicit","ioctl","levee","level","lice","licit","lilt","lite","little","live","loci","loco","loll","loot","lotto","love","lvii","ocelot","oleo","olive","tell","tile","till","tilt","title","tittle","toil","toilet","toilette","toll","tool","veil","velvet","vile","viol","violet","voile","vole","volt"]},{"center":"o","others":["b","g","i","l","m","r"],"words":["bimbo","blob","blog","bloom","boil","boll","bomb","boob","boom","boor","broil","broom","gigolo","glob","gloom","grog","groom","igloo","imbroglio","limbo","limo","logo","loll","loom","mirror","moll","moor","rigor","roil","roll","room"]},{"center":"a","others":["b","c","i","k","l","m"],"words":["abaci","aback","acacia","acclaim","alibi","alkali","bacilli","back","bail","balalaika","balk","ball","balm","biblical","blab","black","blackball","blackmail","cabal","calk","call","calm","cambia","cilia","clack","claim","clam","iamb","iambic","imam","kickback","labia","labial","lack","lama","lamb","lilac","llama","mail","maim","mall","mama","mamma","mammal","mica"]},{"center":"l","others":["a","i","k","o","t","w"],"words":["alit","alkali","allot","allow","alto","atoll","awol","kill","kilo","kilowatt","kilt","koala","lilt","loll","look","loot","lotto","tail","talk","tall","tallow","till","tilt","toil","toll","tool","toolkit","total","twill","wail","walk","wall","wallow","will","willow","wilt","wool"]},{"center":"a","others":["c","l","r","t","u","y"],"words":["accrual","acct","accuracy","actual","actually","actuary","allay","ally","altar","array","arty","attar","attract","atty","aura","aural","aurally","call","caracul","carat","carry","carryall","cart","cataract","catcall","catty","clay","cray","cultural","culturally","curacy","lacy","luau","racy","rally","ratty","rural","tact","talc","tall","tally","tarry","tart","tartar","tartly","tatty","taut","tautly","tract","tray","ultra","yucca"]},{"center":"e","others":["c","f","i","k","n","r"],"words":["creek","crier","eerie","eerier","fence","fencer","fern","ferric","fief","fierce","fiercer","fierier","fife","fine","finer","finickier","fire","free","freer","frier","icier","ickier","iffier","infer","inference","inkier","inner","keen","keener","kicker","kickier","kinkier","knee","knife","neck","nice","nicer","niece","nine","reef","reefer","reek","refer","referee","reference","refine","refiner","rein","rice","rife","rifer"]},{"center":"e","others":["a","c","d","m","u","v"],"words":["accede","acceded","aced","acme","added","adduce","adduced","came","cave","caved","cede","ceded","cued","dame","dammed","dded","dead","decade","deduce","deduced","deed","deeded","deem","deemed","deuce","dude","duded","eave","edamame","edema","emcee","emceed","evacuee","evade","evaded","mace","maced","madame","made","mauve","mead","mecca","meme","vacuumed"]},{"center":"s","others":["h","i","n","o","p","y"],"words":["hippos","hips","hiss","hoops","hops","hypnosis","hypos","inns","ions","nips","noisy","nosh","nosy","onions","oops","opinions","phish","pinions","pins","pippins","pips","piss","poison","poisons","poohs","poops","pops","posh","poss","posy","shin","shinny","shins","shiny","ship","ships","shoo","shoon","shoos","shop","shops","sins","siphon","siphons","sips","sissy","snip","snippy","snips","snoop","snoops","snoopy","sonny","sons","soon","soppy","sops","spin","spins","spiny","spoon","spoons","synopsis","syphon","syphons","sysop","sysops","yips"]},{"center":"l","others":["a","b","e","i","o","v"],"words":["able","alibi","alive","aloe","avail","available","babble","babel","bail","bale","ball","belie","believable","believe","bell","belle","bevel","bible","bile","bill","bivalve","blab","blob","bobble","boil","bola","bole","boll","evil","evolve","label","labia","labial","lava","leave","levee","level","liable","libel","livable","live","liveable","lobe","loll","lovable","love","loveable","lvii","oleo","olive","oval","vale","valve","veal","veil","viable","vial","vile","villa","viol","viola","violable","voile","vole"]},{"center":"n","others":["g","i","k","l","p","u"],"words":["gigging","giggling","ginning","gluing","gulling","gulping","gunk","gunning","inking","inkling","inning","killing","kiln","kilning","king","kingpin","kink","kinking","liking","lining","link","linking","linkup","lugging","lulling","lung","lunging","lupin","niggling","nipping","nuking","null","pigging","piing","piking","piling","pilling","ping","pinging","pining","pink","pinking","pinning","pinup","piping","pippin","pipping","plugging","plugin","plunging","plunk","plunking","puking","pulling","pulping","punk","punning","pupping","unpin","unpinning","unplug","unplugging","upping"]},{"center":"s","others":["a","d","g","h","n","u"],"words":["adds","anus","assn","dads","dash","duds","dungs","duns","gads","gags","gangs","gash","gnash","gnus","guns","gush","hags","handguns","hands","hangs","hash","hugs","hush","nags","nuns","saga","sagas","sags","sand","sands","sang","sans","sash","sass","sauna","saunas","shad","shads","shag","shags","shah","shahs","shun","shuns","shush","snag","snags","snug","snugs","suds","sung","suns","unhands","unsung"]},{"center":"s","others":["c","e","h","l","q","u"],"words":["cells","cheese","cheeses","chess","clueless","clues","cues","culls","cuss","cusses","eels","ells","else","heels","hues","hulls","hush","hushes","leeches","lees","less","lessee","lessees","lulls","lush","lushes","quells","ques","queues","schuss","schusses","scull","sculls","secs","sees","sell","sells","sequel","sequels","shell","shells","shes","shush","shushes","slue","slues","slush","squelch","squelches","success","successes","such","sues","useless","uses"]},{"center":"o","others":["d","f","n","r","u","y"],"words":["dodo","doff","donor","door","dory","dour","dunno","fond","fondu","food","ford","found","foundry","four","frond","furor","noddy","noon","noun","odor","rood","roof","round","runoff","undo","your"]},{"center":"o","others":["a","d","l","n","r","u"],"words":["adorn","aloud","anon","ardor","around","dado","dodo","doll","dollar","donor","doodad","door","dour","droll","drool","dunno","landlord","llano","load","loan","loll","loon","lord","lorn","loud","nodal","nodular","noon","noun","odor","oral","radon","road","roan","roar","roll","rood","round","runaround","undo","unload","unroll"]}]
+;
+
+  var bee = { puzzle:null, center:"", letters:[], words:[], maxScore:0, current:"", score:0, found:[], outerOrder:[0,1,2,3,4,5] };
+  var beeMsgTimeout = null;
+
+  var BEE_RANKS = [
+    { pct:0,    label:"Just Started" },
+    { pct:0.10, label:"Buzzing" },
+    { pct:0.25, label:"Honeycomb" },
+    { pct:0.40, label:"Swarm" },
+    { pct:0.60, label:"Colony" },
+    { pct:0.80, label:"Hive Master" }
+  ];
+
+  function beeScoreWord(word, letters){
+    var base = word.length === 4 ? 1 : word.length;
+    if (word.length >= 7){
+      var uniq = {};
+      for (var i=0;i<word.length;i++) uniq[word[i]] = true;
+      if (Object.keys(uniq).length === letters.length) base += 7; // pangram bonus
+    }
+    return base;
+  }
+
+  function openSpellingBee(){
+    var today = todayStr();
+    var idx = hashString("bee-" + today) % BEE_PUZZLES.length;
+    var p = BEE_PUZZLES[idx];
+    bee.puzzle = p;
+    bee.center = p.center;
+    bee.letters = [p.center].concat(p.others);
+    bee.words = p.words;
+    bee.outerOrder = [0,1,2,3,4,5];
+    bee.current = "";
+    bee.maxScore = 0;
+    p.words.forEach(function(w){ bee.maxScore += beeScoreWord(w, bee.letters); });
+
+    var existing = (store.dailyLog.spellingbee || {})[today];
+    if (existing){
+      bee.score = existing.score;
+      bee.found = existing.wordsFound.slice();
+    } else {
+      bee.score = 0;
+      bee.found = [];
+    }
+
+    renderBeeHex();
+    updateBeeWordDisplay();
+    updateBeeScoreDisplay();
+    renderBeeFoundList();
+    showBeeMessage("", false);
+  }
+
+  function renderBeeHex(){
+    var wrap = document.getElementById("beeHexWrap");
+    wrap.innerHTML = "";
+    var centerCell = document.createElement("div");
+    centerCell.className = "bee-cell center";
+    centerCell.textContent = bee.center.toUpperCase();
+    centerCell.style.left = "50%"; centerCell.style.top = "50%"; centerCell.style.transform = "translate(-50%,-50%)";
+    centerCell.addEventListener("click", function(){ appendBeeLetter(bee.center); });
+    wrap.appendChild(centerCell);
+
+    var others = bee.puzzle.others;
+    for (var i=0;i<6;i++){
+      var letterIdx = bee.outerOrder[i];
+      var letter = others[letterIdx];
+      var angle = (-90 + i*60) * Math.PI/180;
+      var x = 50 + 34*Math.sin(angle);
+      var y = 50 - 34*Math.cos(angle);
+      var cell = document.createElement("div");
+      cell.className = "bee-cell outer";
+      cell.textContent = letter.toUpperCase();
+      cell.style.left = x+"%"; cell.style.top = y+"%"; cell.style.transform = "translate(-50%,-50%)";
+      (function(l){ cell.addEventListener("click", function(){ appendBeeLetter(l); }); })(letter);
+      wrap.appendChild(cell);
+    }
+  }
+
+  function appendBeeLetter(letter){
+    bee.current += letter;
+    updateBeeWordDisplay();
+  }
+  function deleteBeeLetter(){
+    bee.current = bee.current.slice(0, -1);
+    updateBeeWordDisplay();
+  }
+  function updateBeeWordDisplay(){
+    document.getElementById("beeWordDisplay").textContent = bee.current || "\u00A0";
+  }
+
+  function showBeeMessage(text, isGood){
+    var el = document.getElementById("beeMessage");
+    el.textContent = text;
+    el.style.color = isGood ? "var(--good)" : "var(--ink-soft)";
+    if (beeMsgTimeout) clearTimeout(beeMsgTimeout);
+    if (text) beeMsgTimeout = setTimeout(function(){ el.textContent = ""; }, 1800);
+  }
+
+  function submitBeeWord(){
+    var word = bee.current.toLowerCase();
+    bee.current = "";
+    updateBeeWordDisplay();
+    if (!word) return;
+    if (word.length < 4){ showBeeMessage("Too short", false); return; }
+    if (word.indexOf(bee.center) === -1){ showBeeMessage("Missing center letter", false); return; }
+    if (bee.found.indexOf(word) !== -1){ showBeeMessage("Already found", false); return; }
+    if (bee.words.indexOf(word) === -1){ showBeeMessage("Not in word list", false); return; }
+
+    var pts = beeScoreWord(word, bee.letters);
+    var isPangram = pts >= word.length + 7;
+    bee.found.push(word);
+    bee.score += pts;
+
+    var today = todayStr();
+    if (!store.dailyLog.spellingbee) store.dailyLog.spellingbee = {};
+    store.dailyLog.spellingbee[today] = { score: bee.score, wordsFound: bee.found.slice(), maxPossible: bee.maxScore };
+    if (!store.highScores.spellingbee || bee.score > store.highScores.spellingbee){
+      store.highScores.spellingbee = bee.score;
+    }
+    saveStore();
+
+    showBeeMessage(isPangram ? ("Pangram! +" + pts) : ("+" + pts), true);
+    updateBeeScoreDisplay();
+    renderBeeFoundList();
+  }
+
+  function updateBeeScoreDisplay(){
+    document.getElementById("beeScore").textContent = bee.score;
+    var pct = bee.maxScore > 0 ? bee.score / bee.maxScore : 0;
+    var rank = BEE_RANKS[0].label;
+    BEE_RANKS.forEach(function(r){ if (pct >= r.pct) rank = r.label; });
+    document.getElementById("beeRank").textContent = rank;
+  }
+
+  function renderBeeFoundList(){
+    var list = document.getElementById("beeFoundList");
+    list.innerHTML = "";
+    document.getElementById("beeFoundCount").textContent = bee.found.length + " word" + (bee.found.length===1?"":"s") + " found";
+    var sorted = bee.found.slice().sort();
+    sorted.forEach(function(w){
+      var isPangram = new Set ? (new Set(w.split(""))).size === bee.letters.length : false;
+      var chip = document.createElement("div");
+      chip.className = "bee-found-word" + (isPangram ? " pangram" : "");
+      chip.textContent = w;
+      list.appendChild(chip);
+    });
+  }
+
+  function shuffleBeeLetters(){
+    for (var i = bee.outerOrder.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i+1));
+      var tmp = bee.outerOrder[i]; bee.outerOrder[i] = bee.outerOrder[j]; bee.outerOrder[j] = tmp;
+    }
+    renderBeeHex();
+  }
+
+  document.getElementById("beeBackBtn").addEventListener("click", function(){ showPage("favoritesPage"); });
+  document.getElementById("beeDeleteBtn").addEventListener("click", deleteBeeLetter);
+  document.getElementById("beeEnterBtn").addEventListener("click", submitBeeWord);
+  document.getElementById("beeShuffleBtn").addEventListener("click", shuffleBeeLetters);
+  document.addEventListener("keydown", function(e){
+    if (!document.getElementById("spellingbeePage").classList.contains("active")) return;
+    if (e.key === "Enter"){ submitBeeWord(); return; }
+    if (e.key === "Backspace"){ deleteBeeLetter(); return; }
+    var k = e.key.toLowerCase();
+    if (bee.letters.indexOf(k) !== -1) appendBeeLetter(k);
   });
 
   loadStore();
