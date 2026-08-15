@@ -185,6 +185,13 @@
   .road-overlay-card{ text-align:center; }
   .road-overlay-title{ color:#fff; font-size:20px; font-weight:800; margin-bottom:8px; }
   .road-overlay-sub{ color:rgba(255,255,255,0.82); font-size:12.5px; line-height:1.6; margin-bottom:18px; }
+  .road-diff-row{ display:flex; flex-direction:column; gap:8px; width:220px; }
+  .road-diff-btn{ border:none; background:rgba(255,255,255,0.12); color:#fff; font-weight:700; font-size:13.5px; padding:12px; border-radius:11px; cursor:pointer; }
+  .road-diff-btn.selected{ background:var(--accent); }
+  .road-choice-row{ display:flex; flex-direction:column; gap:8px; width:220px; }
+  .road-choice-btn{ border:none; padding:13px; border-radius:11px; font-weight:700; font-size:13.5px; cursor:pointer; }
+  .road-choice-btn.primary{ background:var(--accent); color:#fff; }
+  .road-choice-btn.secondary{ background:rgba(255,255,255,0.12); color:#fff; }
 
   /* ---- settings ---- */
   .setting-row{ display:flex; align-items:center; justify-content:space-between; background:var(--panel); border-radius:14px; padding:16px; box-shadow: inset 0 0 0 1px var(--rule); margin-bottom:12px; }
@@ -226,6 +233,22 @@
 
     <div class="section-title">High Scores</div>
     <div id="highScoreList"></div>
+
+    <div class="section-title">Checkers Record</div>
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-num" id="ckWins">0</div>
+        <div class="stat-label">Wins</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="ckLosses">0</div>
+        <div class="stat-label">Losses</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="ckWinPct">0%</div>
+        <div class="stat-label">Win rate</div>
+      </div>
+    </div>
   </div>
 
   <div id="settingsPage" class="page">
@@ -286,8 +309,8 @@
       <div class="road-overlay" id="roadOverlay">
         <div class="road-overlay-card">
           <div class="road-overlay-title" id="roadOverlayTitle">That One Ad</div>
-          <div class="road-overlay-sub" id="roadOverlaySub">Drag left and right. Avoid the black walls. Green boxes add, red boxes subtract — don't drop below 1.</div>
-          <button class="text-btn" id="roadStartBtn">Play</button>
+          <div class="road-overlay-sub" id="roadOverlaySub">Drag left and right. Avoid the black walls.</div>
+          <div id="roadOverlayButtons"></div>
         </div>
       </div>
     </div>
@@ -319,7 +342,7 @@
   "use strict";
 
   var STORAGE_KEY = "foxGames";
-  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {} };
+  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, checkersRecord: { wins:0, losses:0 } };
 
   function loadStore(){
     try{
@@ -329,6 +352,7 @@
         if (parsed && parsed.dailyLog) store = parsed;
         if (!store.settings) store.settings = { theme:"dark" };
         if (!store.highScores) store.highScores = {};
+        if (!store.checkersRecord) store.checkersRecord = { wins:0, losses:0 };
       }
     }catch(e){}
   }
@@ -403,7 +427,7 @@
 
   // ================= FAVORITES / NEW GAMES (shared heart-tile rendering) =================
   function heartSVG(){
-    return '<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-10-9.2C.5 8.4 2 4.5 5.6 4c2-.3 3.8.8 4.9 2.5C11.6 4.8 13.4 3.7 15.4 4c3.6.5 5.1 4.4 3.6 7.8C19.5 16.4 12 21 12 21z"/></svg>';
+    return '<svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
   }
   function buildGameTile(g){
     var item = document.createElement("div");
@@ -489,6 +513,13 @@
     if (!anyScores){
       hsList.innerHTML = '<div class="empty-note">Play That One Ad to set your first high score.</div>';
     }
+
+    var wins = store.checkersRecord.wins, losses = store.checkersRecord.losses;
+    var totalGames = wins + losses;
+    var winPct = totalGames > 0 ? Math.round((wins/totalGames)*100) : 0;
+    document.getElementById("ckWins").textContent = wins;
+    document.getElementById("ckLosses").textContent = losses;
+    document.getElementById("ckWinPct").textContent = winPct + "%";
   }
 
   // ================= BEST MOVE (CHESS) ENGINE =================
@@ -1005,6 +1036,8 @@
   function showCheckersResult(winner){
     var box = document.getElementById("checkersResult");
     var youWon = winner === "You";
+    if (youWon) store.checkersRecord.wins++; else store.checkersRecord.losses++;
+    saveStore();
     box.innerHTML =
       '<div class="result-headline' + (youWon ? ' perfect' : '') + '">' + (youWon ? "You win!" : "Robot wins") + '</div>' +
       '<div class="result-sub">' + (youWon ? "The robot ran out of legal moves." : "You ran out of legal moves — try again.") + '</div>';
@@ -1027,14 +1060,37 @@
   var roadOverlay = document.getElementById("roadOverlay");
   var roadOverlayTitle = document.getElementById("roadOverlayTitle");
   var roadOverlaySub = document.getElementById("roadOverlaySub");
-  var roadStartBtn = document.getElementById("roadStartBtn");
+  var roadOverlayButtons = document.getElementById("roadOverlayButtons");
+
+  var ROAD_DIFFICULTIES = [
+    { id:"easy", label:"Easy", mult:1 },
+    { id:"normal", label:"Normal", mult:1.25 },
+    { id:"hard", label:"Hard", mult:1.5 },
+    { id:"impossible", label:"Impossible", mult:1.75 }
+  ];
+  var ROAD_BASE_SPEED = 0.00035; // canvas-heights-per-ms at Easy
+
+  var POWER_TYPES = [
+    { kind:"speed2x",   label:"2x Speed",  bad:true  },
+    { kind:"speedHalf", label:"1/2 Speed", bad:false },
+    { kind:"smaller",   label:"Smaller",   bad:false },
+    { kind:"larger",    label:"Larger",    bad:true  },
+    { kind:"goodluck",  label:"Good Luck", bad:false },
+    { kind:"badluck",   label:"Bad Luck",  bad:true  }
+  ];
 
   var road = {
     running:false, gameOverFlag:false, animId:null, lastTime:0,
     canvasW:0, canvasH:0, roadX0:0, roadX1:0, roadW:0,
-    charX:0, charY:0, charR:0, dragging:false,
-    number:1, maxNumber:1, obstacles:[], spawnTimer:0, speedPxMs:0
+    charX:0, charY:0, charR:0, baseCharR:0, dragging:false,
+    number:1, maxNumber:1, obstacles:[], spawnTimer:0,
+    difficulty:"easy", speedMultiplier:1, sizeMultiplier:1, rngShift:0
   };
+
+  function roadEffectiveSpeed(){
+    var diff = ROAD_DIFFICULTIES.filter(function(d){ return d.id === road.difficulty; })[0] || ROAD_DIFFICULTIES[0];
+    return ROAD_BASE_SPEED * diff.mult * road.speedMultiplier;
+  }
 
   function resizeCanvasRoad(){
     var rect = roadCanvas.getBoundingClientRect();
@@ -1046,9 +1102,9 @@
     road.roadW = road.canvasW * 0.8;
     road.roadX0 = road.canvasW * 0.1;
     road.roadX1 = road.roadX0 + road.roadW;
-    road.charR = road.roadW * 0.085;
+    road.baseCharR = road.roadW * 0.085;
+    road.charR = road.baseCharR * road.sizeMultiplier;
     road.charY = road.canvasH - road.canvasH * 0.12;
-    road.speedPxMs = road.canvasH * 0.00035;
     if (!road.charX || road.charX < road.roadX0 || road.charX > road.roadX1){
       road.charX = (road.roadX0 + road.roadX1) / 2;
     }
@@ -1059,23 +1115,41 @@
     road.maxNumber = 1;
     road.obstacles = [];
     road.spawnTimer = 700;
+    road.speedMultiplier = 1;
+    road.sizeMultiplier = 1;
+    road.rngShift = 0;
+    road.charR = road.baseCharR;
     road.charX = (road.roadX0 + road.roadX1) / 2;
     road.gameOverFlag = false;
     road.running = false;
     road.lastTime = 0;
   }
 
+  function randInt(min, max){
+    if (max < min){ var t = min; min = max; max = t; }
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
   function spawnRoadObject(){
     var laneW = road.roadW / 3;
-    if (Math.random() < 0.32){
+    var roll = Math.random();
+    if (roll < 0.30){
+      // bonus door pair
       var greenLeft = Math.random() < 0.5;
       var h = road.canvasH * 0.07;
       road.obstacles.push({ type:"bonus", color: greenLeft ? "green" : "red", x0:road.roadX0, x1:road.roadX0 + road.roadW/2, y:-h, h:h, resolved:false });
       road.obstacles.push({ type:"bonus", color: greenLeft ? "red" : "green", x0:road.roadX0 + road.roadW/2, x1:road.roadX1, y:-h, h:h, resolved:false });
-    } else {
+    } else if (roll < 0.30 + 0.20){
+      // power wall
+      var pt = POWER_TYPES[Math.floor(Math.random() * POWER_TYPES.length)];
       var lane = Math.floor(Math.random() * 3);
-      var h2 = road.canvasH * 0.05;
-      road.obstacles.push({ type:"wall", x0:road.roadX0 + lane*laneW, x1:road.roadX0 + (lane+1)*laneW, y:-h2, h:h2 });
+      var h2 = road.canvasH * 0.055;
+      road.obstacles.push({ type:"power", kind:pt.kind, label:pt.label, bad:pt.bad, x0:road.roadX0 + lane*laneW, x1:road.roadX0 + (lane+1)*laneW, y:-h2, h:h2, resolved:false });
+    } else {
+      // plain black wall
+      var lane2 = Math.floor(Math.random() * 3);
+      var h3 = road.canvasH * 0.05;
+      road.obstacles.push({ type:"wall", x0:road.roadX0 + lane2*laneW, x1:road.roadX0 + (lane2+1)*laneW, y:-h3, h:h3 });
     }
   }
 
@@ -1083,17 +1157,37 @@
     return obj.y + obj.h >= road.charY - road.charR && obj.y <= road.charY + road.charR;
   }
 
+  function applyRoadPower(kind){
+    switch(kind){
+      case "speed2x":   road.speedMultiplier = 2; break;
+      case "speedHalf": road.speedMultiplier = 0.5; break;
+      case "smaller":   road.sizeMultiplier = 0.7; road.charR = road.baseCharR * road.sizeMultiplier; break;
+      case "larger":    road.sizeMultiplier = 1.4; road.charR = road.baseCharR * road.sizeMultiplier; break;
+      case "goodluck":  road.rngShift += 2; break;
+      case "badluck":   road.rngShift -= 2; break;
+    }
+  }
+
   function updateRoadObstacles(dt){
+    var speed = roadEffectiveSpeed();
     road.obstacles.forEach(function(obj){
-      obj.y += road.speedPxMs * dt;
+      obj.y += speed * dt;
       if (road.gameOverFlag) return;
       var xOverlap = (road.charX + road.charR > obj.x0) && (road.charX - road.charR < obj.x1);
       if (obj.type === "wall"){
         if (xOverlap && roadOverlapY(obj)) triggerRoadGameOver("wall");
+      } else if (obj.type === "power"){
+        if (!obj.resolved && xOverlap && roadOverlapY(obj)){
+          obj.resolved = true;
+          applyRoadPower(obj.kind);
+        }
       } else {
         if (!obj.resolved && xOverlap && roadOverlapY(obj)){
           obj.resolved = true;
-          road.number += (obj.color === "green" ? 1 : -1);
+          var delta = obj.color === "green"
+            ? randInt(1 + road.rngShift, 5 + road.rngShift)
+            : randInt(-5 + road.rngShift, -1 + road.rngShift);
+          road.number += delta;
           if (road.number > road.maxNumber) road.maxNumber = road.number;
           if (road.number < 1) triggerRoadGameOver("number");
         }
@@ -1123,6 +1217,20 @@
       if (obj.type === "wall"){
         ctx.fillStyle = "#111111";
         ctx.fillRect(obj.x0, obj.y, obj.x1 - obj.x0, obj.h);
+      } else if (obj.type === "power"){
+        ctx.fillStyle = obj.bad ? "#7A1F1F" : "#1F5C33";
+        ctx.fillRect(obj.x0, obj.y, obj.x1 - obj.x0, obj.h);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "bold " + Math.max(9, Math.round(road.roadW*0.032)) + "px -apple-system, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        var words = obj.label.split(" ");
+        if (words.length > 1){
+          ctx.fillText(words[0], (obj.x0+obj.x1)/2, obj.y + obj.h*0.36);
+          ctx.fillText(words.slice(1).join(" "), (obj.x0+obj.x1)/2, obj.y + obj.h*0.68);
+        } else {
+          ctx.fillText(obj.label, (obj.x0+obj.x1)/2, obj.y + obj.h/2);
+        }
       } else {
         ctx.globalAlpha = 0.55;
         ctx.fillStyle = obj.color === "green" ? "#3EA35A" : "#D14343";
@@ -1153,13 +1261,39 @@
     if (road.running) road.animId = requestAnimationFrame(roadLoop);
   }
 
-  function showRoadOverlay(title, sub, btnText){
+  function showRoadOverlay(title, sub){
     roadOverlayTitle.textContent = title;
     roadOverlaySub.textContent = sub;
-    roadStartBtn.textContent = btnText;
     roadOverlay.classList.remove("hide");
   }
   function hideRoadOverlay(){ roadOverlay.classList.add("hide"); }
+
+  function startRoadRun(){
+    resetRoadState();
+    hideRoadOverlay();
+    road.running = true;
+    road.animId = requestAnimationFrame(roadLoop);
+  }
+
+  function showRoadDifficultyPicker(){
+    roadOverlayButtons.innerHTML = "";
+    var row = document.createElement("div");
+    row.className = "road-diff-row";
+    ROAD_DIFFICULTIES.forEach(function(d){
+      var btn = document.createElement("button");
+      btn.className = "road-diff-btn" + (road.difficulty === d.id ? " selected" : "");
+      btn.textContent = d.label;
+      btn.addEventListener("click", function(){
+        road.difficulty = d.id;
+        store.settings.roadDifficulty = d.id;
+        saveStore();
+        startRoadRun();
+      });
+      row.appendChild(btn);
+    });
+    roadOverlayButtons.appendChild(row);
+    showRoadOverlay("That One Ad", "Drag left and right. Avoid black walls. Green adds, red subtracts — don't drop below 1. Choose a speed:");
+  }
 
   function triggerRoadGameOver(reason){
     if (road.gameOverFlag) return;
@@ -1171,18 +1305,34 @@
     if (isNewBest){ store.highScores.roadgame = road.maxNumber; saveStore(); }
     var reasonText = reason === "wall" ? "You hit a wall." : "Your number dropped below 1.";
     var bestNow = store.highScores.roadgame || road.maxNumber;
+
+    roadOverlayButtons.innerHTML = "";
+    var row = document.createElement("div");
+    row.className = "road-choice-row";
+    var again = document.createElement("button");
+    again.className = "road-choice-btn primary";
+    again.textContent = "Play again at current speed";
+    again.addEventListener("click", startRoadRun);
+    var menu = document.createElement("button");
+    menu.className = "road-choice-btn secondary";
+    menu.textContent = "Return to menu";
+    menu.addEventListener("click", function(){ showPage("favoritesPage"); });
+    row.appendChild(again);
+    row.appendChild(menu);
+    roadOverlayButtons.appendChild(row);
+
     showRoadOverlay(
       "Game Over",
-      reasonText + " Reached " + road.maxNumber + (isNewBest ? " — new high score!" : (" — best: " + bestNow)) + ".",
-      "Play Again"
+      reasonText + " Reached " + road.maxNumber + (isNewBest ? " — new high score!" : (" — best: " + bestNow)) + "."
     );
   }
 
   function openRoadGame(){
+    road.difficulty = (store.settings && store.settings.roadDifficulty) || "easy";
     resizeCanvasRoad();
     resetRoadState();
     drawRoad();
-    showRoadOverlay("That One Ad", "Drag left and right. Avoid the black walls. Green boxes add, red boxes subtract — don't drop below 1.", "Play");
+    showRoadDifficultyPicker();
   }
 
   function stopRoadGame(){
@@ -1190,12 +1340,6 @@
     if (road.animId){ cancelAnimationFrame(road.animId); road.animId = null; }
   }
 
-  roadStartBtn.addEventListener("click", function(){
-    resetRoadState();
-    hideRoadOverlay();
-    road.running = true;
-    road.animId = requestAnimationFrame(roadLoop);
-  });
   document.getElementById("roadBackBtn").addEventListener("click", function(){ showPage("favoritesPage"); });
 
   function roadPointerToX(e){
