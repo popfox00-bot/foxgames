@@ -177,14 +177,28 @@
     touch-action:none;
   }
   #roadCanvas{ width:100%; height:100%; display:block; }
-  .road-timer{
+  .road-hud{
     position:absolute; top:10px; left:10px;
+    display:flex; flex-direction:column; gap:6px;
+    z-index:5; pointer-events:none;
+  }
+  .road-timer{
+    align-self:flex-start;
     background:rgba(0,0,0,0.6); color:#fff;
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size:13px; font-weight:700;
     padding:5px 10px; border-radius:9px;
-    z-index:5; pointer-events:none;
   }
+  .road-active-bar{ display:flex; flex-direction:column; gap:4px; }
+  .road-power-chip{
+    align-self:flex-start;
+    font-size:10.5px; font-weight:700; color:#fff;
+    padding:4px 9px; border-radius:8px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .road-power-chip.bad{ background:rgba(122,31,31,0.85); }
+  .road-power-chip.good{ background:rgba(31,92,51,0.85); }
+  .road-power-chip .chip-time{ font-family: ui-monospace, "SF Mono", Menlo, monospace; opacity:0.85; }
   .road-overlay{
     position:absolute; inset:0;
     background:rgba(0,0,0,0.55);
@@ -316,7 +330,10 @@
     </div>
     <div class="road-wrap" id="roadWrap">
       <canvas id="roadCanvas"></canvas>
-      <div class="road-timer" id="roadTimer">0:00</div>
+      <div class="road-hud">
+        <div class="road-timer" id="roadTimer">0:00</div>
+        <div class="road-active-bar" id="roadActiveBar"></div>
+      </div>
       <div class="road-overlay" id="roadOverlay">
         <div class="road-overlay-card">
           <div class="road-overlay-title" id="roadOverlayTitle">That One Ad</div>
@@ -1109,7 +1126,7 @@
     canvasW:0, canvasH:0, roadX0:0, roadX1:0, roadW:0,
     charX:0, charY:0, charR:0, baseCharR:0, dragging:false,
     number:1, maxNumber:1, obstacles:[], spawnTimer:0, elapsedMs:0,
-    difficulty:"easy", speedMultiplier:1, sizeMultiplier:1, rngShift:0
+    difficulty:"easy", speedMultiplier:1, sizeMultiplier:1, rngShift:0, activePowers:[]
   };
 
   function roadEffectiveSpeed(){
@@ -1144,12 +1161,14 @@
     road.speedMultiplier = 1;
     road.sizeMultiplier = 1;
     road.rngShift = 0;
+    road.activePowers = [];
     road.charR = road.baseCharR;
     road.charX = (road.roadX0 + road.roadX1) / 2;
     road.gameOverFlag = false;
     road.running = false;
     road.lastTime = 0;
     document.getElementById("roadTimer").textContent = "0:00";
+    document.getElementById("roadActiveBar").innerHTML = "";
   }
 
   function randInt(min, max){
@@ -1161,11 +1180,13 @@
     var laneW = road.roadW / 3;
     var roll = Math.random();
     if (roll < 0.30){
-      // bonus door pair
+      // bonus door pair — each side's value is rolled now and locked in, so it can be shown on the door
       var greenLeft = Math.random() < 0.5;
       var h = road.canvasH * 0.07;
-      road.obstacles.push({ type:"bonus", color: greenLeft ? "green" : "red", x0:road.roadX0, x1:road.roadX0 + road.roadW/2, y:-h, h:h, resolved:false });
-      road.obstacles.push({ type:"bonus", color: greenLeft ? "red" : "green", x0:road.roadX0 + road.roadW/2, x1:road.roadX1, y:-h, h:h, resolved:false });
+      var greenDelta = randInt(1 + road.rngShift, 5 + road.rngShift);
+      var redDelta = randInt(-5 + road.rngShift, -1 + road.rngShift);
+      road.obstacles.push({ type:"bonus", color: greenLeft ? "green" : "red", delta: greenLeft ? greenDelta : redDelta, x0:road.roadX0, x1:road.roadX0 + road.roadW/2, y:-h, h:h, resolved:false });
+      road.obstacles.push({ type:"bonus", color: greenLeft ? "red" : "green", delta: greenLeft ? redDelta : greenDelta, x0:road.roadX0 + road.roadW/2, x1:road.roadX1, y:-h, h:h, resolved:false });
     } else if (roll < 0.30 + 0.20){
       // power wall
       var pt = POWER_TYPES[Math.floor(Math.random() * POWER_TYPES.length)];
@@ -1173,7 +1194,7 @@
       var h2 = road.canvasH * 0.055;
       road.obstacles.push({ type:"power", kind:pt.kind, label:pt.label, bad:pt.bad, x0:road.roadX0 + lane*laneW, x1:road.roadX0 + (lane+1)*laneW, y:-h2, h:h2, resolved:false });
     } else {
-      // plain black wall
+      // plain hazard wall
       var lane2 = Math.floor(Math.random() * 3);
       var h3 = road.canvasH * 0.05;
       road.obstacles.push({ type:"wall", x0:road.roadX0 + lane2*laneW, x1:road.roadX0 + (lane2+1)*laneW, y:-h3, h:h3 });
@@ -1184,15 +1205,45 @@
     return obj.y + obj.h >= road.charY - road.charR && obj.y <= road.charY + road.charR;
   }
 
+  // Power-ups/downs last 5s each. Speed and Size are single-slot (a new pickup of that
+  // category replaces/refreshes the old one); Luck effects stack additively while active.
   function applyRoadPower(kind){
-    switch(kind){
-      case "speed2x":   road.speedMultiplier = 2; break;
-      case "speedHalf": road.speedMultiplier = 0.5; break;
-      case "smaller":   road.sizeMultiplier = 0.7; road.charR = road.baseCharR * road.sizeMultiplier; break;
-      case "larger":    road.sizeMultiplier = 1.4; road.charR = road.baseCharR * road.sizeMultiplier; break;
-      case "goodluck":  road.rngShift += 2; break;
-      case "badluck":   road.rngShift -= 2; break;
+    var pt = POWER_TYPES.filter(function(p){ return p.kind === kind; })[0];
+    if (kind === "speed2x" || kind === "speedHalf"){
+      road.activePowers = road.activePowers.filter(function(p){ return p.kind !== "speed2x" && p.kind !== "speedHalf"; });
     }
+    if (kind === "smaller" || kind === "larger"){
+      road.activePowers = road.activePowers.filter(function(p){ return p.kind !== "smaller" && p.kind !== "larger"; });
+    }
+    road.activePowers.push({ kind:kind, label:pt.label, bad:pt.bad, expiresAt: road.elapsedMs + 5000 });
+    recomputeRoadPowers();
+  }
+
+  function recomputeRoadPowers(){
+    road.activePowers = road.activePowers.filter(function(p){ return p.expiresAt > road.elapsedMs; });
+    var speedKind = null, sizeKind = null, luckShift = 0;
+    road.activePowers.forEach(function(p){
+      if (p.kind === "speed2x" || p.kind === "speedHalf") speedKind = p.kind;
+      if (p.kind === "smaller" || p.kind === "larger") sizeKind = p.kind;
+      if (p.kind === "goodluck") luckShift += 2;
+      if (p.kind === "badluck") luckShift -= 2;
+    });
+    road.speedMultiplier = speedKind === "speed2x" ? 2 : speedKind === "speedHalf" ? 0.5 : 1;
+    road.sizeMultiplier = sizeKind === "smaller" ? 0.7 : sizeKind === "larger" ? 1.4 : 1;
+    road.charR = road.baseCharR * road.sizeMultiplier;
+    road.rngShift = luckShift;
+  }
+
+  function renderActivePowersBar(){
+    var bar = document.getElementById("roadActiveBar");
+    bar.innerHTML = "";
+    road.activePowers.forEach(function(p){
+      var secsLeft = Math.max(0, Math.ceil((p.expiresAt - road.elapsedMs) / 1000));
+      var chip = document.createElement("div");
+      chip.className = "road-power-chip " + (p.bad ? "bad" : "good");
+      chip.innerHTML = '<span>' + p.label + '</span><span class="chip-time">' + secsLeft + 's</span>';
+      bar.appendChild(chip);
+    });
   }
 
   function updateRoadObstacles(dt){
@@ -1211,16 +1262,34 @@
       } else {
         if (!obj.resolved && xOverlap && roadOverlapY(obj)){
           obj.resolved = true;
-          var delta = obj.color === "green"
-            ? randInt(1 + road.rngShift, 5 + road.rngShift)
-            : randInt(-5 + road.rngShift, -1 + road.rngShift);
-          road.number += delta;
+          road.number += obj.delta;
           if (road.number > road.maxNumber) road.maxNumber = road.number;
           if (road.number < 1) triggerRoadGameOver("number");
         }
       }
     });
     road.obstacles = road.obstacles.filter(function(o){ return o.y <= road.canvasH + 40; });
+  }
+
+  function drawSpikeWall(ctx, obj){
+    ctx.fillStyle = "#161616";
+    ctx.fillRect(obj.x0, obj.y, obj.x1 - obj.x0, obj.h);
+    var spikes = 6;
+    var spikeW = (obj.x1 - obj.x0) / spikes;
+    var spikeH = obj.h * 0.5;
+    ctx.beginPath();
+    for (var i = 0; i < spikes; i++){
+      var xa = obj.x0 + i*spikeW, xb = xa + spikeW/2, xc = xa + spikeW;
+      ctx.moveTo(xa, obj.y);
+      ctx.lineTo(xb, obj.y - spikeH);
+      ctx.lineTo(xc, obj.y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.font = "bold " + Math.round(obj.h*0.85) + "px -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("💀", (obj.x0+obj.x1)/2, obj.y + obj.h*0.55);
   }
 
   function drawRoad(){
@@ -1242,8 +1311,7 @@
 
     road.obstacles.forEach(function(obj){
       if (obj.type === "wall"){
-        ctx.fillStyle = "#111111";
-        ctx.fillRect(obj.x0, obj.y, obj.x1 - obj.x0, obj.h);
+        drawSpikeWall(ctx, obj);
       } else if (obj.type === "power"){
         ctx.fillStyle = obj.bad ? "#7A1F1F" : "#1F5C33";
         ctx.fillRect(obj.x0, obj.y, obj.x1 - obj.x0, obj.h);
@@ -1263,6 +1331,12 @@
         ctx.fillStyle = obj.color === "green" ? "#3EA35A" : "#D14343";
         ctx.fillRect(obj.x0, obj.y, obj.x1 - obj.x0, obj.h);
         ctx.globalAlpha = 1;
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "bold " + Math.max(11, Math.round(road.roadW*0.05)) + "px -apple-system, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        var sign = obj.delta > 0 ? "+" : "";
+        ctx.fillText(sign + obj.delta, (obj.x0+obj.x1)/2, obj.y + obj.h/2);
       }
     });
 
@@ -1283,6 +1357,8 @@
     road.lastTime = ts;
     road.elapsedMs += dt;
     document.getElementById("roadTimer").textContent = fmtTime(road.elapsedMs);
+    recomputeRoadPowers();
+    renderActivePowersBar();
     road.spawnTimer -= dt;
     if (road.spawnTimer <= 0){ spawnRoadObject(); road.spawnTimer = 1000 + Math.random()*500; }
     updateRoadObstacles(dt);
