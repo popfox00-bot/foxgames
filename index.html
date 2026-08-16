@@ -1607,15 +1607,18 @@
 
   var MAX_ROAD_OBSTACLES = 5;
 
-  // AABB overlap check (with a small safety pad) against everything already on screen,
-  // used to keep freshly-spawned items from landing on top of each other.
+  // AABB overlap check against everything already on screen, with generous fixed
+  // padding (not just item size) so items spawn with real breathing room between
+  // them rather than merely not technically touching.
   function roadSpaceIsFree(x0, x1, y, h){
-    var pad = h * 0.4;
-    var y0 = y - pad, y1 = y + h + pad;
+    var padX = road.roadW * 0.10;
+    var padY = Math.max(road.canvasH * 0.14, h * 1.2);
+    var qx0 = x0 - padX, qx1 = x1 + padX;
+    var qy0 = y - padY, qy1 = y + h + padY;
     return !road.obstacles.some(function(o){
-      var oy0 = o.y - pad, oy1 = o.y + o.h + pad;
-      var xOverlap = x0 < o.x1 && x1 > o.x0;
-      var yOverlap = y0 < oy1 && y1 > oy0;
+      var oy0 = o.y - padY, oy1 = o.y + o.h + padY;
+      var xOverlap = qx0 < o.x1 && qx1 > o.x0;
+      var yOverlap = qy0 < oy1 && qy1 > oy0;
       return xOverlap && yOverlap;
     });
   }
