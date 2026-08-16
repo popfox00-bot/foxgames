@@ -97,7 +97,12 @@
   .stat-num{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:30px; font-weight:700; color:var(--accent); }
   .stat-label{ font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.08em; font-weight:700; margin-top:4px; }
   .stat-sub{ font-size:12px; color:var(--ink-soft); margin-top:18px; }
+  .stat-tier-sub{ font-size:10.5px; font-weight:700; color:var(--accent); margin-top:2px; }
   .section-title{ font-size:14px; font-weight:800; margin:26px 2px 10px; }
+  .section-title-row{ display:flex; align-items:center; gap:8px; margin:26px 2px 10px; }
+  .section-title-row .section-title{ margin:0; }
+  .stat-section-icon{ width:26px; height:26px; border-radius:8px; flex-shrink:0; background:linear-gradient(160deg, var(--accent), #B85A24); display:flex; align-items:center; justify-content:center; }
+  .stat-section-icon svg{ width:60%; height:60%; }
   .highscore-row{ display:flex; align-items:center; justify-content:space-between; background:var(--panel); border-radius:14px; padding:14px 16px; margin-bottom:10px; box-shadow: inset 0 0 0 1px var(--rule); }
   .highscore-name{ font-size:13.5px; font-weight:700; }
   .highscore-stats{ display:flex; gap:18px; }
@@ -120,7 +125,6 @@
   .sq.dark{ background:var(--board-dark); }
 
   /* Best Move (chess) interaction states */
-  .piece.selectable{ box-shadow:0 0 0 2px rgba(226,121,61,0.4), 0 2px 3px rgba(0,0,0,0.3); cursor:pointer; }
   .piece.selected{ box-shadow:0 0 0 3px var(--accent), 0 2px 3px rgba(0,0,0,0.3); }
   .sq.dest-preview::after{
     content:""; position:absolute; inset:9%; border-radius:50%;
@@ -166,6 +170,15 @@
   .text-btn{ margin-top:14px; width:100%; border:none; background:var(--panel); color:var(--ink); font-weight:700; font-size:13px; padding:12px; border-radius:12px; cursor:pointer; box-shadow: inset 0 0 0 1px var(--rule); }
 
   /* ---- Spelling Bee ---- */
+  .bee-tier-wrap{ margin-bottom:18px; }
+  .bee-tier-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; }
+  .bee-tier-label{ font-size:15px; font-weight:800; color:var(--ink); }
+  .bee-tier-score{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:13px; font-weight:700; color:var(--ink-soft); }
+  .bee-tier-track{ position:relative; height:8px; border-radius:5px; background:var(--panel-hi); box-shadow: inset 0 0 0 1px var(--rule); overflow:hidden; }
+  .bee-tier-fill{ position:absolute; left:0; top:0; bottom:0; border-radius:5px; background:var(--accent); transition:width .3s ease; }
+  .bee-tier-ticks{ position:relative; height:14px; margin-top:4px; }
+  .bee-tier-tick{ position:absolute; top:0; transform:translateX(-50%); font-size:8.5px; font-weight:700; color:var(--ink-soft); white-space:nowrap; }
+  .bee-tier-tick.reached{ color:var(--accent); }
   .bee-score-row{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; }
   .bee-score-num{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:30px; font-weight:700; color:var(--accent); }
   .bee-score-label{ font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; font-weight:700; }
@@ -402,12 +415,13 @@
       </div>
     </div>
 
-    <div class="bee-score-row">
-      <div>
-        <div class="bee-score-num" id="beeScore">0</div>
-        <div class="bee-score-label">points</div>
+    <div class="bee-tier-wrap">
+      <div class="bee-tier-head">
+        <span class="bee-tier-label" id="beeRank">Freshman</span>
+        <span class="bee-tier-score"><span id="beeScore">0</span> pts</span>
       </div>
-      <div class="bee-rank" id="beeRank">Just Started</div>
+      <div class="bee-tier-track"><div class="bee-tier-fill" id="beeTierFill"></div></div>
+      <div class="bee-tier-ticks" id="beeTierTicks"></div>
     </div>
 
     <div class="bee-word-display" id="beeWordDisplay">&nbsp;</div>
@@ -471,7 +485,7 @@
   "use strict";
 
   var STORAGE_KEY = "foxGames";
-  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, longestTimes: {}, checkersRecord: { wins:0, losses:0 } };
+  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, longestTimes: {}, checkersRecord: { wins:0, losses:0, totalMovesInWins:0, movesTrackedWins:0 } };
 
   function loadStore(){
     try{
@@ -482,7 +496,9 @@
         if (!store.settings) store.settings = { theme:"dark" };
         if (!store.highScores) store.highScores = {};
         if (!store.longestTimes) store.longestTimes = {};
-        if (!store.checkersRecord) store.checkersRecord = { wins:0, losses:0 };
+        if (!store.checkersRecord) store.checkersRecord = { wins:0, losses:0, totalMovesInWins:0, movesTrackedWins:0 };
+        if (store.checkersRecord.totalMovesInWins === undefined) store.checkersRecord.totalMovesInWins = 0;
+        if (store.checkersRecord.movesTrackedWins === undefined) store.checkersRecord.movesTrackedWins = 0;
       }
     }catch(e){}
   }
@@ -639,10 +655,52 @@
   function statCardHtml(num, label){
     return '<div class="stat-card"><div class="stat-num">' + num + '</div><div class="stat-label">' + label + '</div></div>';
   }
-  function statSectionHtml(title, cardsHtml, subtext){
-    return '<div class="section-title">' + title + '</div>'
+  function statCardHtmlWithSub(num, sub, label){
+    return '<div class="stat-card"><div class="stat-num">' + num + '</div><div class="stat-tier-sub">' + sub + '</div><div class="stat-label">' + label + '</div></div>';
+  }
+  function statSectionHtml(gameId, title, cardsHtml, subtext){
+    var game = GAMES.filter(function(g){ return g.id === gameId; })[0];
+    var iconHtml = game ? ('<div class="stat-section-icon">' + game.icon + '</div>') : '';
+    return '<div class="section-title-row">' + iconHtml + '<div class="section-title">' + title + '</div></div>'
       + '<div class="stat-row">' + cardsHtml + '</div>'
       + (subtext ? ('<p class="stat-sub">' + subtext + '</p>') : '');
+  }
+
+  // Looks up which BEE_RANKS tier the current Spelling Bee high score corresponds
+  // to, using the daily-log entry that produced that high score for its max-possible.
+  function beeHighestTierLabel(){
+    var highScore = store.highScores.spellingbee;
+    if (highScore === undefined) return BEE_RANKS[0].label;
+    var log = store.dailyLog.spellingbee || {};
+    var maxP = null;
+    Object.keys(log).forEach(function(date){
+      if (log[date].score === highScore && log[date].maxPossible) maxP = log[date].maxPossible;
+    });
+    if (!maxP) return BEE_RANKS[0].label;
+    var pct = highScore / maxP;
+    var rank = BEE_RANKS[0].label;
+    BEE_RANKS.forEach(function(r){ if (pct >= r.pct) rank = r.label; });
+    return rank;
+  }
+
+  // Daily Five: correctness + guess-efficiency stats (no points framing).
+  function dailyFiveStats(){
+    var log = store.dailyLog.dailyfive || {};
+    var totalDays = 0, correctDays = 0, guessSum = 0;
+    Object.keys(log).forEach(function(date){
+      var entry = log[date];
+      totalDays++;
+      if (entry.result === "win"){
+        correctDays++;
+        guessSum += (entry.guesses ? entry.guesses.length : 0);
+      }
+    });
+    return {
+      totalCorrect: correctDays,
+      totalDays: totalDays,
+      pctCorrect: totalDays > 0 ? Math.round((correctDays/totalDays)*100) : 0,
+      avgGuesses: correctDays > 0 ? Math.round((guessSum/correctDays)*10)/10 : 0
+    };
   }
 
   // Each game gets its own clearly-labeled section — nothing is combined across games.
@@ -651,41 +709,43 @@
 
     // Best Move: points-based daily challenge
     var bm = pointsStatsFor("chess");
-    out += statSectionHtml("Best Move",
+    out += statSectionHtml("chess", "Best Move",
       statCardHtml(bm.total, "Total Points") + statCardHtml(bm.avgPct + "%", "Avg % of Max"),
       bm.count > 0 ? ("Based on " + bm.count + " day" + (bm.count===1?"":"s") + " played.") : "Play to start tracking.");
 
-    // Spelling Bee: points-based daily challenge, plus its own high score
+    // Spelling Bee: points-based daily challenge, high score tagged with the tier it reached
     var sb = pointsStatsFor("spellingbee");
     var sbHigh = store.highScores.spellingbee !== undefined ? store.highScores.spellingbee : 0;
-    out += statSectionHtml("Spelling Bee",
-      statCardHtml(sb.total, "Total Points") + statCardHtml(sbHigh, "High Score") + statCardHtml(sb.avgPct + "%", "Avg % of Max"),
+    out += statSectionHtml("spellingbee", "Spelling Bee",
+      statCardHtml(sb.total, "Total Points") + statCardHtmlWithSub(sbHigh, beeHighestTierLabel(), "High Score") + statCardHtml(sb.avgPct + "%", "Avg % of Max"),
       sb.count > 0 ? ("Based on " + sb.count + " day" + (sb.count===1?"":"s") + " played.") : "Play to start tracking.");
 
-    // Daily Five: points-based daily challenge (score = 7 - guesses used, 0 on a loss), plus high score
-    var df5 = pointsStatsFor("dailyfive");
-    var dfHigh = store.highScores.dailyfive !== undefined ? store.highScores.dailyfive : 0;
-    out += statSectionHtml("Daily Five",
-      statCardHtml(df5.total, "Total Points") + statCardHtml(dfHigh, "High Score") + statCardHtml(df5.avgPct + "%", "Avg % of Max"),
-      df5.count > 0 ? ("Based on " + df5.count + " day" + (df5.count===1?"":"s") + " played.") : "Play to start tracking.");
+    // Daily Five: correctness-focused stats
+    var df5 = dailyFiveStats();
+    out += statSectionHtml("dailyfive", "Daily Five",
+      statCardHtml(df5.totalCorrect, "Total Correct") + statCardHtml(df5.pctCorrect + "%", "% of Days Correct") + statCardHtml(df5.avgGuesses, "Avg Guesses to Correct"),
+      df5.totalDays > 0 ? ("Based on " + df5.totalDays + " day" + (df5.totalDays===1?"":"s") + " played.") : "Play to start tracking.");
 
     // That One Ad: high score + longest time, no points concept
     var adHigh = store.highScores.roadgame;
     var adTime = store.longestTimes.roadgame;
     if (adHigh !== undefined || adTime !== undefined){
-      out += statSectionHtml("That One Ad",
+      out += statSectionHtml("roadgame", "That One Ad",
         statCardHtml(adHigh !== undefined ? adHigh : 0, "High Score") + statCardHtml(adTime !== undefined ? fmtTime(adTime) : "0:00", "Longest Time"),
         null);
     } else {
-      out += statSectionHtml("That One Ad", '<div class="empty-note" style="grid-column:1/-1;">Play to set your first high score.</div>', null);
+      out += statSectionHtml("roadgame", "That One Ad", '<div class="empty-note" style="grid-column:1/-1;">Play to set your first high score.</div>', null);
     }
 
-    // Checkers: wins/losses, no points concept
+    // Checkers: combined W/L record, win rate, and average moves needed to win
     var wins = store.checkersRecord.wins, losses = store.checkersRecord.losses;
     var totalGames = wins + losses;
     var winPct = totalGames > 0 ? Math.round((wins/totalGames)*100) : 0;
-    out += statSectionHtml("Checkers",
-      statCardHtml(wins, "Wins") + statCardHtml(losses, "Losses") + statCardHtml(winPct + "%", "Win Rate"),
+    var avgMovesToWin = store.checkersRecord.movesTrackedWins > 0
+      ? Math.round((store.checkersRecord.totalMovesInWins / store.checkersRecord.movesTrackedWins) * 10) / 10
+      : 0;
+    out += statSectionHtml("checkers", "Checkers",
+      statCardHtml(wins + "\u2013" + losses, "W/L") + statCardHtml(winPct + "%", "Win Rate") + statCardHtml(avgMovesToWin, "Avg Moves to Win"),
       null);
 
     document.getElementById("statsBody").innerHTML = out;
@@ -886,9 +946,6 @@
           pEl.className = "piece " + (piece.color === "b" ? "black" : "white");
           pEl.textContent = pieceGlyph(piece.type);
           if (isSelected) pEl.classList.add("selected");
-          else if (interactive && piece.color === chessPuzzle.side && !selectedSquare && hasAnyMove(r,c)){
-            pEl.classList.add("selectable");
-          }
           sq.appendChild(pEl);
         }
 
@@ -1039,8 +1096,9 @@
         res.moves.forEach(function(m){ allMoves.push({ fr:r, fc:c, r:m.r, c:m.c }); });
       }
     }
-    if (allCaptures.length > 0) return { captures:allCaptures, moves:[] };
-    return { captures:[], moves:allMoves };
+    // Captures are no longer mandatory — every legal move (capture or simple)
+    // from every piece is available to choose from.
+    return { captures:allCaptures, moves:allMoves };
   }
   function ckExecuteStep(board, fr, fc, tr, tc, capR, capC){
     var piece = board[fr][fc];
@@ -1068,6 +1126,7 @@
   var ckSelected = null;
   var ckActivePiece = null;
   var ckGameOver = false;
+  var ckMoveCount = 0;
 
   function openCheckers(){
     ckBoard = ckInitBoard();
@@ -1075,6 +1134,7 @@
     ckSelected = null;
     ckActivePiece = null;
     ckGameOver = false;
+    ckMoveCount = 0;
     document.getElementById("checkersResult").style.display = "none";
     renderCheckersBoard();
     updateCheckersStatus();
@@ -1094,7 +1154,7 @@
     var movableSquares = {};
     var destForSelected = [];
     if (legal){
-      var options = legal.captures.length > 0 ? legal.captures : legal.moves;
+      var options = legal.captures.concat(legal.moves); // captures not mandatory
       options.forEach(function(m){ movableSquares[m.fr+","+m.fc] = true; });
       if (ckSelected){
         options.forEach(function(m){
@@ -1133,7 +1193,7 @@
     var legal = ckActivePiece
       ? { captures: ckMovesForSquare(ckBoard, ckActivePiece.r, ckActivePiece.c).captures.map(function(m){ return { fr:ckActivePiece.r, fc:ckActivePiece.c, r:m.r, c:m.c, capR:m.capR, capC:m.capC }; }), moves:[] }
       : ckAllMoves(ckBoard, "r");
-    var options = legal.captures.length > 0 ? legal.captures : legal.moves;
+    var options = legal.captures.concat(legal.moves); // captures not mandatory
 
     if (ckSelected){
       var dest = options.filter(function(m){ return m.fr===ckSelected.r && m.fc===ckSelected.c && m.r===r && m.c===c; })[0];
@@ -1146,6 +1206,7 @@
           ckActivePiece = null;
           ckSelected = null;
           ckTurn = "b";
+          ckMoveCount++;
         }
         renderCheckersBoard();
         if (checkCheckersGameOver()) return;
@@ -1172,7 +1233,7 @@
       var legal = active
         ? { captures: ckMovesForSquare(ckBoard, active.r, active.c).captures.map(function(m){ return { fr:active.r, fc:active.c, r:m.r, c:m.c, capR:m.capR, capC:m.capC }; }), moves:[] }
         : ckAllMoves(ckBoard, "b");
-      var options = legal.captures.length > 0 ? legal.captures : legal.moves;
+      var options = legal.captures.concat(legal.moves); // captures not mandatory
       if (options.length === 0) break;
       var pick = options[Math.floor(Math.random() * options.length)];
       var stepRes = ckExecuteStep(ckBoard, pick.fr, pick.fc, pick.r, pick.c, pick.capR, pick.capC);
@@ -1205,7 +1266,13 @@
   function showCheckersResult(winner){
     var box = document.getElementById("checkersResult");
     var youWon = winner === "You";
-    if (youWon) store.checkersRecord.wins++; else store.checkersRecord.losses++;
+    if (youWon){
+      store.checkersRecord.wins++;
+      store.checkersRecord.totalMovesInWins += ckMoveCount;
+      store.checkersRecord.movesTrackedWins++;
+    } else {
+      store.checkersRecord.losses++;
+    }
     saveStore();
     box.innerHTML =
       '<div class="result-headline' + (youWon ? ' perfect' : '') + '">' + (youWon ? "You win!" : "Robot wins") + '</div>' +
@@ -1249,6 +1316,8 @@
     { kind:"goodluck",  label:"Good Luck", bad:false },
     { kind:"badluck",   label:"Bad Luck",  bad:true  }
   ];
+  // Short glyphs drawn on each power's small geometric shape (no room for full labels).
+  var POWER_SHORT_LABEL = { speed2x:"2X", speedHalf:"\u00BD", smaller:"S", larger:"L", goodluck:"GL", badluck:"BL" };
 
   var road = {
     running:false, gameOverFlag:false, animId:null, lastTime:0,
@@ -1256,8 +1325,25 @@
     charX:0, charY:0, charR:0, baseCharR:0, dragging:false,
     number:1, maxNumber:1, obstacles:[], spawnTimer:0, elapsedMs:0,
     difficulty:"easy", speedMultiplier:1, sizeMultiplier:1, rngShift:0, activePowers:[],
-    wallSizeMultiplier:1, currentTier:0, lastTierNotified:0, drainTimer:null
+    wallSizeMultiplier:1, currentTier:0, lastTierNotified:0, drainTimer:null,
+    roadColor:"#A9D8F0", chipParticles:[]
   };
+
+  // Speed powerups also scale the game clock itself: 1/2 Speed halves the rate the
+  // timer/tier/decay advance, 2x Speed doubles it — independent of size powerups.
+  function timeScaleFromSpeedPowers(){
+    var scale = 1;
+    road.activePowers.forEach(function(p){
+      if (p.kind === "speed2x") scale *= 2;
+      if (p.kind === "speedHalf") scale *= 0.5;
+    });
+    return scale;
+  }
+
+  function randomRoadColor(){
+    var hue = Math.floor(Math.random() * 360);
+    return "hsl(" + hue + ", 55%, 72%)";
+  }
 
   function roadEffectiveSpeed(){
     var diff = ROAD_DIFFICULTIES.filter(function(d){ return d.id === road.difficulty; })[0] || ROAD_DIFFICULTIES[0];
@@ -1297,6 +1383,8 @@
     road.currentTier = 0;
     road.lastTierNotified = 0;
     road.drainTimer = null;
+    road.roadColor = "#A9D8F0";
+    road.chipParticles = [];
     road.charR = road.baseCharR;
     road.charX = (road.roadX0 + road.roadX1) / 2;
     road.gameOverFlag = false;
@@ -1315,16 +1403,17 @@
     roadTierPopupTimeout = setTimeout(function(){ roadTierPopupEl.classList.remove("show"); }, 1600);
   }
 
-  // Drain schedule: tier 0 = none, tier 1 (30-59s) = 1pt every 2s,
-  // tier 2 (60-89s) = 1pt/s, tier 3+ = (tier-1)pts/s.
+  // Drain schedule, pushed back a full 30s tier later than before: tier 0-1 (0-59s) = none,
+  // tier 2 (60-89s) = 1pt every 2s, tier 3 (90-119s) = 1pt/s, tier 4+ = (tier-2)pts/s.
   function drainConfigForTier(tier){
-    if (tier <= 0) return null;
-    if (tier === 1) return { interval:2000, amount:1 };
-    return { interval:1000, amount: tier - 1 };
+    var dtier = tier - 1;
+    if (dtier <= 0) return null;
+    if (dtier === 1) return { interval:2000, amount:1 };
+    return { interval:1000, amount: dtier - 1 };
   }
 
-  // Every 30s: bumps the tier (popup + compounding 1.1x speed), and drives the drain
-  // cadence above. dt is the frame's delta time in ms.
+  // Every 30s: bumps the tier (popup + compounding 1.1x speed), reshuffles the road color,
+  // and drives the drain cadence above. dt is the frame's (game-clock-scaled) delta time in ms.
   function updateRoadTier(dt){
     var currentSec = Math.floor(road.elapsedMs / 1000);
     var tier = Math.floor(currentSec / 30);
@@ -1334,6 +1423,9 @@
     if (tier > road.lastTierNotified){
       road.lastTierNotified = tier;
       showTierPopup((tier * 30) + "s!");
+    }
+    if (tierChanged){
+      road.roadColor = randomRoadColor();
     }
 
     var cfg = drainConfigForTier(tier);
@@ -1348,10 +1440,61 @@
     var guard = 0;
     while (road.drainTimer <= 0 && guard < 20){
       road.number -= cfg.amount;
+      spawnChipParticles(road.charX, road.charY, 4 + Math.floor(Math.random()*3));
       road.drainTimer += cfg.interval;
       guard++;
       if (road.number < 1){ triggerRoadGameOver("drain"); break; }
     }
+  }
+
+  // ---- Decay chip particles: small triangles that flake off the character and fall
+  // off the bottom of the screen, blinking in rhythm with the decay tick. The character
+  // circle itself is never altered — this is a separate overlay effect. ----
+  function spawnChipParticles(cx, cy, count){
+    for (var i=0;i<count;i++){
+      road.chipParticles.push({
+        x: cx + (Math.random()-0.5) * road.charR * 1.3,
+        y: cy + (Math.random()-0.5) * road.charR * 0.7,
+        vx: road.canvasW * (Math.random()-0.5) * 0.00035,
+        vy: road.canvasH * (0.00035 + Math.random()*0.00035),
+        size: road.charR * (0.16 + Math.random()*0.12),
+        rot: Math.random() * Math.PI * 2,
+        vr: (Math.random()-0.5) * 0.008,
+        born: road.elapsedMs,
+        life: 1200 + Math.random()*600
+      });
+    }
+  }
+  function updateChipParticles(dt){
+    road.chipParticles.forEach(function(p){
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.rot += p.vr * dt;
+    });
+    road.chipParticles = road.chipParticles.filter(function(p){
+      return (road.elapsedMs - p.born) < p.life && p.y < road.canvasH + 40;
+    });
+  }
+  function drawChipParticles(ctx){
+    road.chipParticles.forEach(function(p){
+      var age = road.elapsedMs - p.born;
+      var blinkOn = Math.floor(age/180) % 2 === 0;
+      if (!blinkOn) return;
+      var fadeStart = p.life * 0.7;
+      var alpha = age > fadeStart ? Math.max(0, 1 - (age-fadeStart)/(p.life-fadeStart)) : 1;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = "#E2793D";
+      ctx.beginPath();
+      ctx.moveTo(0, -p.size);
+      ctx.lineTo(p.size*0.87, p.size*0.5);
+      ctx.lineTo(-p.size*0.87, p.size*0.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    });
   }
 
   function randInt(min, max){
@@ -1437,13 +1580,31 @@
       applyLuckToDoor(doorB);
       road.obstacles.push(doorA, doorB);
     } else if (roll < 0.30 + 0.20){
-      // power wall
+      // power pickup — a small unique geometric shape per power type, only a third of a
+      // lane column wide, so it's much less likely to collide with than a full wall.
       var pt = POWER_TYPES[Math.floor(Math.random() * POWER_TYPES.length)];
       var lane = Math.floor(Math.random() * 3);
-      var h2 = road.canvasH * 0.055;
-      road.obstacles.push({ type:"power", kind:pt.kind, label:pt.label, bad:pt.bad, x0:road.roadX0 + lane*laneW, x1:road.roadX0 + (lane+1)*laneW, y:-h2, h:h2, resolved:false });
+      var shapeW = laneW / 3;
+      var laneCenterX = road.roadX0 + lane*laneW + laneW/2;
+      road.obstacles.push({
+        type:"power", kind:pt.kind, label:pt.label, bad:pt.bad,
+        x0: laneCenterX - shapeW/2, x1: laneCenterX + shapeW/2,
+        y:-shapeW, h:shapeW, resolved:false
+      });
+    } else if (roll < 0.30 + 0.20 + 0.25){
+      // hollow black spike — a third the size of a plain wall, no skull icon. Colliding
+      // subtracts from the character's number instead of ending the run outright; the
+      // subtraction escalates every 30s (1, then 2 at 30s, 3 at 60s, and so on).
+      var laneS = Math.floor(Math.random() * 3);
+      var spikeW = laneW / 3;
+      var laneCenterS = road.roadX0 + laneS*laneW + laneW/2;
+      var hS = (road.canvasH * 0.05) / 3 * 2;
+      road.obstacles.push({
+        type:"spike", x0: laneCenterS - spikeW/2, x1: laneCenterS + spikeW/2,
+        y:-hS, h:hS, resolved:false
+      });
     } else {
-      // plain hazard wall
+      // plain hazard wall — still ends the run outright on contact
       var lane2 = Math.floor(Math.random() * 3);
       var h3 = road.canvasH * 0.05;
       var wr = wallXRangeForLane(lane2, road.wallSizeMultiplier);
@@ -1509,6 +1670,14 @@
       var xOverlap = (road.charX + road.charR > obj.x0) && (road.charX - road.charR < obj.x1);
       if (obj.type === "wall"){
         if (xOverlap && roadOverlapY(obj)) triggerRoadGameOver("wall");
+      } else if (obj.type === "spike"){
+        if (!obj.resolved && xOverlap && roadOverlapY(obj)){
+          obj.resolved = true;
+          var subtractAmount = road.currentTier + 1;
+          road.number -= subtractAmount;
+          spawnChipParticles(road.charX, road.charY, 3 + Math.floor(Math.random()*2));
+          if (road.number < 1) triggerRoadGameOver("spike");
+        }
       } else if (obj.type === "power"){
         if (!obj.resolved && xOverlap && roadOverlapY(obj)){
           obj.resolved = true;
@@ -1550,6 +1719,72 @@
     ctx.fill();
   }
 
+  // Hollow (stroke-only) black spike hazard — a third the size of a full wall, no icon.
+  function drawHollowSpike(ctx, obj){
+    var cx = (obj.x0 + obj.x1) / 2;
+    var w = obj.x1 - obj.x0;
+    ctx.strokeStyle = "#161616";
+    ctx.lineWidth = Math.max(1.5, w * 0.16);
+    ctx.beginPath();
+    ctx.moveTo(cx, obj.y);
+    ctx.lineTo(obj.x1, obj.y + obj.h);
+    ctx.lineTo(obj.x0, obj.y + obj.h);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  function drawStarPath(ctx, cx, cy, outerR, innerR, points){
+    var step = Math.PI / points;
+    for (var i=0;i<points*2;i++){
+      var r = (i % 2 === 0) ? outerR : innerR;
+      var ang = -Math.PI/2 + i*step;
+      var px = cx + r*Math.cos(ang), py = cy + r*Math.sin(ang);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  }
+
+  // Each power type gets its own small unique geometric shape (a third of a lane column
+  // wide) instead of a full-lane wall, so pickups are much less likely to be collided with.
+  function drawPowerShape(ctx, obj){
+    var cx = (obj.x0 + obj.x1) / 2;
+    var cy = obj.y + obj.h / 2;
+    var r = (obj.x1 - obj.x0) / 2;
+    ctx.fillStyle = obj.bad ? "#7A1F1F" : "#1F5C33";
+    ctx.beginPath();
+    if (obj.kind === "speed2x"){
+      ctx.moveTo(cx, cy-r); ctx.lineTo(cx+r*0.87, cy+r*0.6); ctx.lineTo(cx-r*0.87, cy+r*0.6); ctx.closePath();
+    } else if (obj.kind === "speedHalf"){
+      ctx.moveTo(cx, cy+r); ctx.lineTo(cx+r*0.87, cy-r*0.6); ctx.lineTo(cx-r*0.87, cy-r*0.6); ctx.closePath();
+    } else if (obj.kind === "smaller"){
+      ctx.moveTo(cx, cy-r); ctx.lineTo(cx+r, cy); ctx.lineTo(cx, cy+r); ctx.lineTo(cx-r, cy); ctx.closePath();
+    } else if (obj.kind === "larger"){
+      for (var i=0;i<5;i++){
+        var ang = -Math.PI/2 + i*(Math.PI*2/5);
+        var px = cx + r*Math.cos(ang), py = cy + r*Math.sin(ang);
+        if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.closePath();
+    } else if (obj.kind === "goodluck"){
+      drawStarPath(ctx, cx, cy, r, r*0.45, 5);
+    } else if (obj.kind === "badluck"){
+      for (var j=0;j<6;j++){
+        var ang2 = -Math.PI/2 + j*(Math.PI*2/6);
+        var px2 = cx + r*Math.cos(ang2), py2 = cy + r*Math.sin(ang2);
+        if (j===0) ctx.moveTo(px2,py2); else ctx.lineTo(px2,py2);
+      }
+      ctx.closePath();
+    } else {
+      ctx.rect(obj.x0, obj.y, obj.x1-obj.x0, obj.h);
+    }
+    ctx.fill();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold " + Math.max(7, Math.round(r*0.75)) + "px -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(POWER_SHORT_LABEL[obj.kind] || "", cx, cy);
+  }
+
   function drawSpikeWall(ctx, obj){
     var bg = "#161616";
     ctx.fillStyle = bg;
@@ -1574,7 +1809,7 @@
     ctx.clearRect(0, 0, road.canvasW, road.canvasH);
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, road.canvasW, road.canvasH);
-    ctx.fillStyle = "#A9D8F0";
+    ctx.fillStyle = road.roadColor || "#A9D8F0";
     ctx.fillRect(road.roadX0, 0, road.roadW, road.canvasH);
 
     ctx.strokeStyle = "rgba(255,255,255,0.55)";
@@ -1589,20 +1824,10 @@
     road.obstacles.forEach(function(obj){
       if (obj.type === "wall"){
         drawSpikeWall(ctx, obj);
+      } else if (obj.type === "spike"){
+        drawHollowSpike(ctx, obj);
       } else if (obj.type === "power"){
-        ctx.fillStyle = obj.bad ? "#7A1F1F" : "#1F5C33";
-        ctx.fillRect(obj.x0, obj.y, obj.x1 - obj.x0, obj.h);
-        ctx.fillStyle = "#FFFFFF";
-        ctx.font = "bold " + Math.max(9, Math.round(road.roadW*0.032)) + "px -apple-system, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        var words = obj.label.split(" ");
-        if (words.length > 1){
-          ctx.fillText(words[0], (obj.x0+obj.x1)/2, obj.y + obj.h*0.36);
-          ctx.fillText(words.slice(1).join(" "), (obj.x0+obj.x1)/2, obj.y + obj.h*0.68);
-        } else {
-          ctx.fillText(obj.label, (obj.x0+obj.x1)/2, obj.y + obj.h/2);
-        }
+        drawPowerShape(ctx, obj);
       } else {
         var boxFill = obj.color === "green" ? "#3EA35A" : obj.color === "red" ? "#D14343" : "#FFFFFF";
         ctx.globalAlpha = obj.color === "neutral" ? 0.4 : 0.55;
@@ -1628,21 +1853,25 @@
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(String(road.number), road.charX, road.charY);
+
+    drawChipParticles(ctx);
   }
 
   function roadLoop(ts){
     if (!road.running) return;
     var dt = road.lastTime ? (ts - road.lastTime) : 16;
     road.lastTime = ts;
-    road.elapsedMs += dt;
+    var gameDt = dt * timeScaleFromSpeedPowers();
+    road.elapsedMs += gameDt;
     document.getElementById("roadTimer").textContent = fmtTime(road.elapsedMs);
-    updateRoadTier(dt);
+    updateRoadTier(gameDt);
     if (road.gameOverFlag) return;
     recomputeRoadPowers();
     renderActivePowersBar();
     road.spawnTimer -= dt;
     if (road.spawnTimer <= 0){ spawnRoadObject(); road.spawnTimer = 1000 + Math.random()*500; }
     updateRoadObstacles(dt);
+    updateChipParticles(dt);
     drawRoad();
     if (road.running) road.animId = requestAnimationFrame(roadLoop);
   }
@@ -1694,6 +1923,7 @@
     if (isNewLongest){ store.longestTimes.roadgame = road.elapsedMs; }
     if (isNewBest || isNewLongest) saveStore();
     var reasonText = reason === "wall" ? "You hit a wall."
+      : reason === "spike" ? "A spike chipped you down to nothing."
       : reason === "drain" ? "The drain wore you down."
       : "Your number dropped below 1.";
     var bestNow = store.highScores.roadgame || road.maxNumber;
@@ -1766,12 +1996,12 @@
   var beeMsgTimeout = null;
 
   var BEE_RANKS = [
-    { pct:0,    label:"Just Started" },
-    { pct:0.10, label:"Buzzing" },
-    { pct:0.25, label:"Honeycomb" },
-    { pct:0.40, label:"Swarm" },
-    { pct:0.60, label:"Colony" },
-    { pct:0.80, label:"Hive Master" }
+    { pct:0,    label:"Freshman" },
+    { pct:0.10, label:"Student" },
+    { pct:0.25, label:"Bright" },
+    { pct:0.40, label:"Sharp" },
+    { pct:0.60, label:"Smart" },
+    { pct:0.80, label:"Genius" }
   ];
 
   function beeScoreWord(word, letters){
@@ -1893,6 +2123,19 @@
     var rank = BEE_RANKS[0].label;
     BEE_RANKS.forEach(function(r){ if (pct >= r.pct) rank = r.label; });
     document.getElementById("beeRank").textContent = rank;
+
+    var fillPct = Math.max(0, Math.min(100, pct * 100));
+    document.getElementById("beeTierFill").style.width = fillPct + "%";
+
+    var ticksEl = document.getElementById("beeTierTicks");
+    ticksEl.innerHTML = "";
+    BEE_RANKS.forEach(function(r){
+      var tick = document.createElement("div");
+      tick.className = "bee-tier-tick" + (pct >= r.pct ? " reached" : "");
+      tick.style.left = (r.pct * 100) + "%";
+      tick.textContent = r.label;
+      ticksEl.appendChild(tick);
+    });
   }
 
   function renderBeeFoundList(){
