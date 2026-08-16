@@ -202,6 +202,8 @@
   .sol-draw-toggle{ display:flex; gap:8px; margin-bottom:14px; }
   .sol-draw-btn{ flex:1; border:none; background:var(--panel); color:var(--ink-soft); font-weight:700; font-size:12px; padding:10px; border-radius:10px; cursor:pointer; box-shadow: inset 0 0 0 1px var(--rule); }
   .sol-draw-btn.active{ background:var(--accent); color:#fff; box-shadow:none; }
+  .sol-action-row{ display:flex; gap:10px; margin-top:14px; }
+  .sol-action-row .text-btn{ flex:1; }
 
   /* ---- Spelling Bee ---- */
   .bee-tier-wrap{ margin-bottom:18px; }
@@ -434,7 +436,10 @@
     <div class="sol-top-row" id="solTopRow"></div>
     <div class="sol-tableau" id="solTableau"></div>
     <div class="chess-result" id="solResult" style="display:none;"></div>
-    <button class="text-btn" id="solNewGameBtn">New Game</button>
+    <div class="sol-action-row">
+      <button class="text-btn" id="solHintBtn" style="margin-top:0;">Hint</button>
+      <button class="text-btn" id="solNewGameBtn" style="margin-top:0;">New Game</button>
+    </div>
   </div>
 
   <div id="roadPage" class="page">
@@ -1693,6 +1698,62 @@
     updateSolStatus();
   }
 
+  // ---- Hint: find one legal move (foundation moves first, then tableau shuffles,
+  // then waste-to-tableau), or fall back to suggesting a draw if nothing is playable. ----
+  function findSolHint(){
+    if (sol.waste.length){
+      var w = sol.waste[sol.waste.length-1];
+      if (solTopCardMovableToFoundation(w)) return { type:"waste" };
+    }
+    for (var c=0;c<7;c++){
+      var pile = sol.tableau[c];
+      var topCard = pile[pile.length-1];
+      if (pile.length && topCard.faceUp && solTopCardMovableToFoundation(topCard)){
+        return { type:"tableau", col:c, index:pile.length-1 };
+      }
+    }
+    for (var c2=0;c2<7;c2++){
+      var pile2 = sol.tableau[c2];
+      for (var i=0;i<pile2.length;i++){
+        if (!pile2[i].faceUp || !solSequenceValid(c2,i)) continue;
+        for (var t=0;t<7;t++){
+          if (t===c2) continue;
+          if (!solCardMovableToTableauColumn(pile2[i], t)) continue;
+          // Skip a no-op-feeling suggestion: an unaccompanied King already sitting
+          // alone at the bottom of its column moving to another empty column.
+          if (i===0 && pile2[i].rank===13 && sol.tableau[t].length===0) continue;
+          return { type:"tableau", col:c2, index:i };
+        }
+      }
+    }
+    if (sol.waste.length){
+      var w2 = sol.waste[sol.waste.length-1];
+      for (var t2=0;t2<7;t2++){
+        if (solCardMovableToTableauColumn(w2, t2)) return { type:"waste" };
+      }
+    }
+    return null;
+  }
+  function flashSolStockHint(){
+    sol.selected = null;
+    renderSolitaire();
+    var stockEl = document.getElementById("solTopRow").children[0];
+    if (stockEl){
+      stockEl.classList.add("targetable");
+      setTimeout(function(){ stockEl.classList.remove("targetable"); }, 1600);
+    }
+  }
+  function handleSolHintTap(){
+    if (sol.gameOver) return;
+    var hint = findSolHint();
+    if (hint){
+      sol.selected = hint.type === "waste" ? { type:"waste" } : { type:"tableau", col:hint.col, index:hint.index };
+      renderSolitaire();
+    } else {
+      flashSolStockHint();
+    }
+  }
+
   // ---- Rendering ----
   function updateSolStatus(){
     var el = document.getElementById("solStatus");
@@ -1753,7 +1814,7 @@
         var isTop = i===0;
         var wEl = buildSolCardEl(wc, isTop, isTop && sol.selected && sol.selected.type==="waste");
         wEl.style.left = ((showCount-1-i) * 14) + "%";
-        wEl.style.zIndex = String(10+i);
+        wEl.style.zIndex = String(20 - i);
         if (isTop){
           wEl.addEventListener("click", function(e){ e.stopPropagation(); handleSolCardTap("waste"); });
         }
@@ -1786,6 +1847,15 @@
   function renderSolTableau(){
     var container = document.getElementById("solTableau");
     container.innerHTML = "";
+    // Measure once, before any columns are (re)appended — measuring each column's own
+    // width mid-loop is unreliable for flex:1 items, since early columns would report
+    // an inflated width before their sibling columns exist to share the row with.
+    var containerWidth = container.getBoundingClientRect().width || 322;
+    var gap = 6;
+    var colWidth = (containerWidth - gap*6) / 7;
+    var cardH = colWidth / 0.7;
+    var faceDownStep = cardH * 0.16;
+    var faceUpStep = cardH * 0.30;
     for (var c=0;c<7;c++){
       (function(colIndex){
         var colEl = document.createElement("div");
@@ -1794,10 +1864,6 @@
         container.appendChild(colEl);
 
         var pile = sol.tableau[colIndex];
-        var colWidth = colEl.getBoundingClientRect().width || 46;
-        var cardH = colWidth / 0.7;
-        var faceDownStep = cardH * 0.16;
-        var faceUpStep = cardH * 0.30;
 
         if (solColumnIsValidTarget(colIndex)) colEl.classList.add("targetable");
 
@@ -1829,6 +1895,7 @@
 
   document.getElementById("solBackBtn").addEventListener("click", function(){ showPage("favoritesPage"); });
   document.getElementById("solNewGameBtn").addEventListener("click", function(){ dealNewSolitaireGame(); });
+  document.getElementById("solHintBtn").addEventListener("click", handleSolHintTap);
   document.getElementById("solDraw1Btn").addEventListener("click", function(){
     sol.drawCount = 1; store.settings.solDrawCount = 1; saveStore(); updateSolDrawButtons();
   });
