@@ -272,12 +272,13 @@
   .road-tier-popup{
     position:absolute; top:38%; left:50%;
     transform:translate(-50%,-50%) scale(0.8);
-    font-size:36px; font-weight:900; color:#fff;
-    text-shadow:0 3px 10px rgba(0,0,0,0.55);
+    text-align:center; width:80%;
     opacity:0; pointer-events:none; z-index:8;
     transition:opacity .3s ease, transform .3s ease;
   }
   .road-tier-popup.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+  .tier-popup-main{ font-size:36px; font-weight:900; color:#fff; text-shadow:0 3px 10px rgba(0,0,0,0.55); }
+  .tier-popup-sub{ margin-top:4px; font-size:12px; font-weight:700; color:rgba(255,255,255,0.9); text-shadow:0 2px 6px rgba(0,0,0,0.55); }
   .road-power-chip{
     align-self:flex-start;
     font-size:10.5px; font-weight:700; color:#fff;
@@ -307,6 +308,8 @@
 
   /* ---- settings ---- */
   .setting-row{ display:flex; align-items:center; justify-content:space-between; background:var(--panel); border-radius:14px; padding:16px; box-shadow: inset 0 0 0 1px var(--rule); margin-bottom:12px; }
+  .setting-sub{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  .mini-btn{ border:none; background:var(--panel-hi); color:var(--ink); font-weight:700; font-size:12px; padding:9px 16px; border-radius:9px; cursor:pointer; box-shadow: inset 0 0 0 1px var(--rule); flex-shrink:0; }
   .setting-label{ font-size:14px; font-weight:700; }
   .theme-toggle{ display:flex; background:var(--panel-hi); border-radius:10px; padding:3px; }
   .theme-btn{ border:none; background:none; padding:8px 14px; border-radius:8px; font-size:12.5px; font-weight:700; color:var(--ink-soft); cursor:pointer; }
@@ -344,6 +347,8 @@
         <button class="theme-btn" id="themeDarkBtn">Dark</button>
       </div>
     </div>
+    <div class="section-title">Games</div>
+    <div id="gameSettingsList"></div>
   </div>
 
   <div id="chessPage" class="page">
@@ -450,7 +455,7 @@
       </button>
       <div>
         <p class="eyebrow">Daily Puzzle</p>
-        <h1 style="margin-bottom:0;">Daily Five</h1>
+        <h1 style="margin-bottom:0;">Daily Word</h1>
       </div>
     </div>
 
@@ -534,7 +539,7 @@
       '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.5 3-1.5 2-1.5-2L12 3z"/><path d="M8 21h8"/><path d="M9 21c-.5-3 .5-5 1-6.5C10.5 13 9 12 9 10c0-1.7 1.3-3 3-3s3 1.3 3 3c0 2-1.5 3-1.5 4.5.5 1.5 1.5 3.5 1 6.5"/></svg>'
     },
     { id:"checkers", name:"Checkers", page:"checkersPage", defaultFavorite:false, icon:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="15" r="5"/><circle cx="15" cy="9" r="5"/></svg>'
+      '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="15" r="5"/><circle cx="15" cy="9" r="5" fill="white"/></svg>'
     },
     { id:"roadgame", name:"That One Ad", page:"roadPage", defaultFavorite:false, icon:
       '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3L7 21"/><path d="M15 3l2 18"/><path d="M11 8h2M10.5 13h3M10 18h4"/></svg>'
@@ -542,8 +547,8 @@
     { id:"spellingbee", name:"Spelling Bee", page:"spellingbeePage", defaultFavorite:false, icon:
       '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,3 19,7 19,15 12,19 5,15 5,7"/><circle cx="12" cy="11" r="2.4" fill="white" stroke="none"/></svg>'
     },
-    { id:"dailyfive", name:"Daily Five", page:"dailyFivePage", defaultFavorite:false, icon:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="4" height="4"/><rect x="8.5" y="9" width="4" height="4"/><rect x="14" y="9" width="4" height="4"/><rect x="19.5" y="9" width="1.5" height="4"/></svg>'
+    { id:"dailyfive", name:"Daily Word", page:"dailyFivePage", defaultFavorite:false, icon:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="9" width="3.4" height="4"/><rect x="5.2" y="9" width="3.4" height="4"/><rect x="9.4" y="9" width="3.4" height="4"/><rect x="13.6" y="9" width="3.4" height="4" fill="white"/><rect x="17.8" y="9" width="3.4" height="4"/></svg>'
     }
   ];
   function ensureFavorites(){
@@ -559,6 +564,40 @@
     saveStore();
   }
 
+  // ================= SETTINGS: PER-GAME LIST =================
+  // Resets Best Move as if today had never been played — removes today's saved result
+  // (so the puzzle regenerates fresh) and its contribution to Best Move's statistics,
+  // without touching any other day's history.
+  function resetBestMoveToday(){
+    var today = todayStr();
+    if (store.dailyLog.chess) delete store.dailyLog.chess[today];
+    saveStore();
+  }
+
+  function renderGameSettings(){
+    var list = document.getElementById("gameSettingsList");
+    list.innerHTML = "";
+    GAMES.forEach(function(g){
+      var row = document.createElement("div");
+      row.className = "setting-row";
+      var label = document.createElement("div");
+      label.innerHTML = '<div class="setting-label">' + g.name + '</div>';
+      row.appendChild(label);
+      if (g.id === "chess"){
+        var resetBtn = document.createElement("button");
+        resetBtn.className = "mini-btn";
+        resetBtn.textContent = "Reset";
+        resetBtn.addEventListener("click", function(){
+          resetBestMoveToday();
+          resetBtn.textContent = "Done";
+          setTimeout(function(){ resetBtn.textContent = "Reset"; }, 1200);
+        });
+        row.appendChild(resetBtn);
+      }
+      list.appendChild(row);
+    });
+  }
+
   // ================= NAVIGATION =================
   var pages = ["favoritesPage","newGamesPage","statsPage","settingsPage","chessPage","checkersPage","roadPage","spellingbeePage","dailyFivePage"];
   function showPage(id){
@@ -569,6 +608,7 @@
     if (id === "statsPage") renderStats();
     if (id === "favoritesPage") renderFavorites();
     if (id === "newGamesPage") renderNewGames();
+    if (id === "settingsPage") renderGameSettings();
     if (id !== "roadPage") stopRoadGame();
   }
   document.querySelectorAll(".tab-btn").forEach(function(btn){
@@ -722,7 +762,7 @@
 
     // Daily Five: correctness-focused stats
     var df5 = dailyFiveStats();
-    out += statSectionHtml("dailyfive", "Daily Five",
+    out += statSectionHtml("dailyfive", "Daily Word",
       statCardHtml(df5.totalCorrect, "Total Correct") + statCardHtml(df5.pctCorrect + "%", "% of Days Correct") + statCardHtml(df5.avgGuesses, "Avg Guesses to Correct"),
       df5.totalDays > 0 ? ("Based on " + df5.totalDays + " day" + (df5.totalDays===1?"":"s") + " played.") : "Play to start tracking.");
 
@@ -1317,7 +1357,7 @@
     { kind:"badluck",   label:"Bad Luck",  bad:true  }
   ];
   // Short glyphs drawn on each power's small geometric shape (no room for full labels).
-  var POWER_SHORT_LABEL = { speed2x:"2X", speedHalf:"\u00BD", smaller:"S", larger:"L", goodluck:"GL", badluck:"BL" };
+  // Power labels are now shown in full (see drawPowerShape) since the shapes are larger.
 
   var road = {
     running:false, gameOverFlag:false, animId:null, lastTime:0,
@@ -1341,8 +1381,11 @@
   }
 
   function randomRoadColor(){
-    var hue = Math.floor(Math.random() * 360);
-    return "hsl(" + hue + ", 55%, 72%)";
+    // Only blue, yellow, purple, and orange hue bands — never red or green.
+    var bands = [[20,40],[45,65],[200,250],[260,290]];
+    var band = bands[Math.floor(Math.random() * bands.length)];
+    var hue = band[0] + Math.random() * (band[1] - band[0]);
+    return "hsl(" + Math.round(hue) + ", 55%, 72%)";
   }
 
   function roadEffectiveSpeed(){
@@ -1396,20 +1439,20 @@
     if (roadTierPopupTimeout){ clearTimeout(roadTierPopupTimeout); roadTierPopupTimeout = null; }
   }
 
-  function showTierPopup(text){
-    roadTierPopupEl.textContent = text;
+  function showTierPopup(text, subtext){
+    roadTierPopupEl.innerHTML = '<div class="tier-popup-main">' + text + '</div>'
+      + (subtext ? ('<div class="tier-popup-sub">' + subtext + '</div>') : '');
     roadTierPopupEl.classList.add("show");
     if (roadTierPopupTimeout) clearTimeout(roadTierPopupTimeout);
-    roadTierPopupTimeout = setTimeout(function(){ roadTierPopupEl.classList.remove("show"); }, 1600);
+    roadTierPopupTimeout = setTimeout(function(){ roadTierPopupEl.classList.remove("show"); }, 2200);
   }
 
-  // Drain schedule, pushed back a full 30s tier later than before: tier 0-1 (0-59s) = none,
-  // tier 2 (60-89s) = 1pt every 2s, tier 3 (90-119s) = 1pt/s, tier 4+ = (tier-2)pts/s.
+  // Drain schedule: tier 0 = none, tier 1 (30-59s) = 1pt every 2s,
+  // tier 2 (60-89s) = 1pt/s, tier 3+ = (tier-1)pts/s.
   function drainConfigForTier(tier){
-    var dtier = tier - 1;
-    if (dtier <= 0) return null;
-    if (dtier === 1) return { interval:2000, amount:1 };
-    return { interval:1000, amount: dtier - 1 };
+    if (tier <= 0) return null;
+    if (tier === 1) return { interval:2000, amount:1 };
+    return { interval:1000, amount: tier - 1 };
   }
 
   // Every 30s: bumps the tier (popup + compounding 1.1x speed), reshuffles the road color,
@@ -1422,7 +1465,7 @@
 
     if (tier > road.lastTierNotified){
       road.lastTierNotified = tier;
-      showTierPopup((tier * 30) + "s!");
+      showTierPopup((tier * 30) + "s!", "Accelerated growth potential and faster decay");
     }
     if (tierChanged){
       road.roadColor = randomRoadColor();
@@ -1580,11 +1623,11 @@
       applyLuckToDoor(doorB);
       road.obstacles.push(doorA, doorB);
     } else if (roll < 0.30 + 0.20){
-      // power pickup — a small unique geometric shape per power type, only a third of a
-      // lane column wide, so it's much less likely to collide with than a full wall.
+      // power pickup — a large unique geometric shape per power type, half a lane
+      // column wide, labeled clearly so it's obvious what it does.
       var pt = POWER_TYPES[Math.floor(Math.random() * POWER_TYPES.length)];
       var lane = Math.floor(Math.random() * 3);
-      var shapeW = laneW / 3;
+      var shapeW = laneW / 2;
       var laneCenterX = road.roadX0 + lane*laneW + laneW/2;
       road.obstacles.push({
         type:"power", kind:pt.kind, label:pt.label, bad:pt.bad,
@@ -1592,9 +1635,9 @@
         y:-shapeW, h:shapeW, resolved:false
       });
     } else if (roll < 0.30 + 0.20 + 0.25){
-      // hollow black spike — a third the size of a plain wall, no skull icon. Colliding
-      // subtracts from the character's number instead of ending the run outright; the
-      // subtraction escalates every 30s (1, then 2 at 30s, 3 at 60s, and so on).
+      // barbed-wire bush hazard — a third the size of a plain wall, hollow/no icon.
+      // Colliding subtracts from the character's number instead of ending the run
+      // outright; the subtraction escalates every 30s (1, then 2 at 30s, 3 at 60s...).
       var laneS = Math.floor(Math.random() * 3);
       var spikeW = laneW / 3;
       var laneCenterS = road.roadX0 + laneS*laneW + laneW/2;
@@ -1719,18 +1762,43 @@
     ctx.fill();
   }
 
-  // Hollow (stroke-only) black spike hazard — a third the size of a full wall, no icon.
+  // A tangled barbed-wire bush — hollow black loops with a barbed wire strand crossing
+  // through, no icon. A third the size of a full wall.
   function drawHollowSpike(ctx, obj){
     var cx = (obj.x0 + obj.x1) / 2;
-    var w = obj.x1 - obj.x0;
+    var cy = obj.y + obj.h / 2;
+    var r = (obj.x1 - obj.x0) / 2;
     ctx.strokeStyle = "#161616";
-    ctx.lineWidth = Math.max(1.5, w * 0.16);
+    ctx.lineCap = "round";
+    ctx.lineWidth = Math.max(1.1, r * 0.13);
+    var loops = 3;
+    for (var i=0;i<loops;i++){
+      var ang = (i/loops) * Math.PI*2 + 0.4;
+      var lx = cx + Math.cos(ang) * r * 0.22;
+      var ly = cy + Math.sin(ang) * r * 0.18;
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(ang);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r*0.6, r*0.4, 0, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // barbed wire strand across the bush, with small X-shaped barbs
     ctx.beginPath();
-    ctx.moveTo(cx, obj.y);
-    ctx.lineTo(obj.x1, obj.y + obj.h);
-    ctx.lineTo(obj.x0, obj.y + obj.h);
-    ctx.closePath();
+    ctx.moveTo(cx - r*0.9, cy + r*0.1);
+    ctx.lineTo(cx + r*0.9, cy - r*0.1);
     ctx.stroke();
+    var barbCount = 3;
+    for (var j=0;j<barbCount;j++){
+      var t = j/(barbCount-1);
+      var bx = (cx - r*0.7) + t*(r*1.4);
+      var by = (cy + r*0.07) - t*(r*0.14);
+      ctx.beginPath();
+      ctx.moveTo(bx - r*0.14, by - r*0.14); ctx.lineTo(bx + r*0.14, by + r*0.14);
+      ctx.moveTo(bx - r*0.14, by + r*0.14); ctx.lineTo(bx + r*0.14, by - r*0.14);
+      ctx.stroke();
+    }
   }
 
   function drawStarPath(ctx, cx, cy, outerR, innerR, points){
@@ -1744,8 +1812,8 @@
     ctx.closePath();
   }
 
-  // Each power type gets its own small unique geometric shape (a third of a lane column
-  // wide) instead of a full-lane wall, so pickups are much less likely to be collided with.
+  // Each power type gets its own large unique geometric shape (half a lane column wide)
+  // with a clear multi-line label of what it does.
   function drawPowerShape(ctx, obj){
     var cx = (obj.x0 + obj.x1) / 2;
     var cy = obj.y + obj.h / 2;
@@ -1779,10 +1847,16 @@
     }
     ctx.fill();
     ctx.fillStyle = "#FFFFFF";
-    ctx.font = "bold " + Math.max(7, Math.round(r*0.75)) + "px -apple-system, sans-serif";
+    ctx.font = "bold " + Math.max(8, Math.round(r*0.26)) + "px -apple-system, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(POWER_SHORT_LABEL[obj.kind] || "", cx, cy);
+    var words = obj.label.split(" ");
+    if (words.length > 1){
+      ctx.fillText(words[0], cx, cy - r*0.16);
+      ctx.fillText(words.slice(1).join(" "), cx, cy + r*0.16);
+    } else {
+      ctx.fillText(obj.label, cx, cy);
+    }
   }
 
   function drawSpikeWall(ctx, obj){
@@ -1869,7 +1943,12 @@
     recomputeRoadPowers();
     renderActivePowersBar();
     road.spawnTimer -= dt;
-    if (road.spawnTimer <= 0){ spawnRoadObject(); road.spawnTimer = 1000 + Math.random()*500; }
+    if (road.spawnTimer <= 0){
+      spawnRoadObject();
+      if (Math.random() < 0.45) spawnRoadObject();
+      if (Math.random() < 0.15) spawnRoadObject();
+      road.spawnTimer = 550 + Math.random()*350;
+    }
     updateRoadObstacles(dt);
     updateChipParticles(dt);
     drawRoad();
