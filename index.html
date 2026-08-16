@@ -169,6 +169,40 @@
   .result-again{ font-size:11.5px; color:var(--ink-soft); margin-top:12px; }
   .text-btn{ margin-top:14px; width:100%; border:none; background:var(--panel); color:var(--ink); font-weight:700; font-size:13px; padding:12px; border-radius:12px; cursor:pointer; box-shadow: inset 0 0 0 1px var(--rule); }
 
+  /* ---- Solitaire ---- */
+  .sol-top-row{ display:flex; gap:6px; margin-bottom:16px; }
+  .sol-pile{
+    position:relative; width:13%; aspect-ratio:0.7; border-radius:8px;
+    box-shadow: inset 0 0 0 1.5px var(--rule); background:var(--panel);
+  }
+  .sol-pile.targetable::after, .sol-column.targetable::after{
+    content:""; position:absolute; inset:-3px; border-radius:10px;
+    border:2.5px dashed var(--accent); animation:pulseTarget 1.3s ease-in-out infinite; pointer-events:none;
+  }
+  .sol-pile-hint{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:15px; color:var(--ink-soft); opacity:0.4; font-weight:800; }
+  .sol-spacer{ flex:1; }
+  .sol-stock-count{
+    position:absolute; bottom:2px; right:4px; font-size:9px; font-weight:800; color:var(--ink-soft);
+  }
+  .sol-tableau{ display:flex; gap:6px; }
+  .sol-column{ flex:1; position:relative; min-height:34px; }
+  .sol-card{
+    position:absolute; left:0; width:100%; aspect-ratio:0.7; border-radius:7px;
+    background:#F7F5F0; box-shadow:0 2px 4px rgba(0,0,0,0.28), inset 0 0 0 1px rgba(0,0,0,0.10);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-weight:800; font-size:clamp(10px,3vw,14px); cursor:pointer; user-select:none; -webkit-user-select:none;
+    line-height:1.05; transition:box-shadow .12s ease;
+  }
+  .sol-card .sol-suit{ font-size:1.15em; margin-top:1px; }
+  .sol-card.red{ color:#C0453A; }
+  .sol-card.black{ color:#1A1A1C; }
+  .sol-card.facedown{ background:linear-gradient(160deg, var(--accent), #7A3A12); box-shadow:0 2px 4px rgba(0,0,0,0.28), inset 0 0 0 1px rgba(255,255,255,0.12); }
+  .sol-card.selectable{ cursor:pointer; }
+  .sol-card.selected{ box-shadow:0 0 0 3px var(--accent), 0 2px 4px rgba(0,0,0,0.28); }
+  .sol-draw-toggle{ display:flex; gap:8px; margin-bottom:14px; }
+  .sol-draw-btn{ flex:1; border:none; background:var(--panel); color:var(--ink-soft); font-weight:700; font-size:12px; padding:10px; border-radius:10px; cursor:pointer; box-shadow: inset 0 0 0 1px var(--rule); }
+  .sol-draw-btn.active{ background:var(--accent); color:#fff; box-shadow:none; }
+
   /* ---- Spelling Bee ---- */
   .bee-tier-wrap{ margin-bottom:18px; }
   .bee-tier-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; }
@@ -382,6 +416,27 @@
     <button class="text-btn" id="checkersNewGameBtn">New Game</button>
   </div>
 
+  <div id="solitairePage" class="page">
+    <div class="top-bar">
+      <button class="icon-btn" id="solBackBtn" aria-label="Back">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+      </button>
+      <div>
+        <p class="eyebrow">Klondike</p>
+        <h1 style="margin-bottom:0;">Solitaire</h1>
+      </div>
+    </div>
+    <p class="chess-status" id="solStatus"></p>
+    <div class="sol-draw-toggle">
+      <button class="sol-draw-btn" id="solDraw1Btn">Draw 1</button>
+      <button class="sol-draw-btn" id="solDraw3Btn">Draw 3</button>
+    </div>
+    <div class="sol-top-row" id="solTopRow"></div>
+    <div class="sol-tableau" id="solTableau"></div>
+    <div class="chess-result" id="solResult" style="display:none;"></div>
+    <button class="text-btn" id="solNewGameBtn">New Game</button>
+  </div>
+
   <div id="roadPage" class="page">
     <div class="top-bar">
       <button class="icon-btn" id="roadBackBtn" aria-label="Back">
@@ -490,7 +545,7 @@
   "use strict";
 
   var STORAGE_KEY = "foxGames";
-  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, longestTimes: {}, checkersRecord: { wins:0, losses:0, totalMovesInWins:0, movesTrackedWins:0 } };
+  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, longestTimes: {}, checkersRecord: { wins:0, losses:0, totalMovesInWins:0, movesTrackedWins:0 }, solitaireRecord: { wins:0, played:0, bestMoves:null } };
 
   function loadStore(){
     try{
@@ -504,6 +559,10 @@
         if (!store.checkersRecord) store.checkersRecord = { wins:0, losses:0, totalMovesInWins:0, movesTrackedWins:0 };
         if (store.checkersRecord.totalMovesInWins === undefined) store.checkersRecord.totalMovesInWins = 0;
         if (store.checkersRecord.movesTrackedWins === undefined) store.checkersRecord.movesTrackedWins = 0;
+        if (!store.solitaireRecord) store.solitaireRecord = { wins:0, played:0, bestMoves:null };
+        if (store.solitaireRecord.wins === undefined) store.solitaireRecord.wins = 0;
+        if (store.solitaireRecord.played === undefined) store.solitaireRecord.played = 0;
+        if (store.solitaireRecord.bestMoves === undefined) store.solitaireRecord.bestMoves = null;
       }
     }catch(e){}
   }
@@ -549,6 +608,9 @@
     },
     { id:"dailyfive", name:"Daily Word", page:"dailyFivePage", defaultFavorite:false, icon:
       '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="9" width="3.4" height="4"/><rect x="5.2" y="9" width="3.4" height="4"/><rect x="9.4" y="9" width="3.4" height="4"/><rect x="13.6" y="9" width="3.4" height="4" fill="white"/><rect x="17.8" y="9" width="3.4" height="4"/></svg>'
+    },
+    { id:"solitaire", name:"Solitaire", page:"solitairePage", defaultFavorite:false, icon:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="10" height="14" rx="1.6"/><path d="M18 7h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1v-2" fill="none"/><path d="M9 8l1.6 3.2h-3.2z" fill="white" stroke="none"/></svg>'
     }
   ];
   function ensureFavorites(){
@@ -599,7 +661,7 @@
   }
 
   // ================= NAVIGATION =================
-  var pages = ["favoritesPage","newGamesPage","statsPage","settingsPage","chessPage","checkersPage","roadPage","spellingbeePage","dailyFivePage"];
+  var pages = ["favoritesPage","newGamesPage","statsPage","settingsPage","chessPage","checkersPage","roadPage","spellingbeePage","dailyFivePage","solitairePage"];
   function showPage(id){
     pages.forEach(function(p){ document.getElementById(p).classList.toggle("active", p===id); });
     ["tabFavorites","tabNewGames","tabStats","tabSettings"].forEach(function(t){
@@ -622,6 +684,7 @@
     else if (g.id === "roadgame") openRoadGame();
     else if (g.id === "spellingbee") openSpellingBee();
     else if (g.id === "dailyfive") openDailyFive();
+    else if (g.id === "solitaire") openSolitaire();
   }
 
   // ================= FAVORITES / NEW GAMES (shared heart-tile rendering) =================
@@ -786,6 +849,14 @@
       : 0;
     out += statSectionHtml("checkers", "Checkers",
       statCardHtml(wins + "\u2013" + losses, "W/L") + statCardHtml(winPct + "%", "Win Rate") + statCardHtml(avgMovesToWin, "Avg Moves to Win"),
+      null);
+
+    // Solitaire: win rate and fewest moves in a won game
+    var solWins = store.solitaireRecord.wins, solPlayed = store.solitaireRecord.played;
+    var solWinPct = solPlayed > 0 ? Math.round((solWins/solPlayed)*100) : 0;
+    var solBest = store.solitaireRecord.bestMoves;
+    out += statSectionHtml("solitaire", "Solitaire",
+      statCardHtml(solWins, "Wins") + statCardHtml(solWinPct + "%", "Win Rate") + statCardHtml(solBest !== null ? solBest : "\u2014", "Fewest Moves to Win"),
       null);
 
     document.getElementById("statsBody").innerHTML = out;
@@ -1329,6 +1400,441 @@
 
   document.getElementById("checkersBackBtn").addEventListener("click", function(){ showPage("favoritesPage"); });
   document.getElementById("checkersNewGameBtn").addEventListener("click", function(){ openCheckers(); });
+
+  // ================= SOLITAIRE (KLONDIKE) ENGINE =================
+  var SUITS = ["S","H","D","C"];
+  var sol = {
+    tableau: [[],[],[],[],[],[],[]],
+    foundations: { S:[], H:[], D:[], C:[] },
+    stock: [], waste: [],
+    drawCount: 1, selected: null, moves: 0, gameOver: false, won: false
+  };
+
+  function solBuildDeck(){
+    var deck = [];
+    SUITS.forEach(function(s){
+      for (var r=1;r<=13;r++) deck.push({ suit:s, rank:r, faceUp:false });
+    });
+    return deck;
+  }
+  function solShuffle(deck){
+    for (var i=deck.length-1;i>0;i--){
+      var j = Math.floor(Math.random()*(i+1));
+      var t=deck[i]; deck[i]=deck[j]; deck[j]=t;
+    }
+    return deck;
+  }
+  function solIsRed(card){ return card.suit==="H" || card.suit==="D"; }
+  function solRankLabel(rank){
+    if (rank===1) return "A";
+    if (rank===11) return "J";
+    if (rank===12) return "Q";
+    if (rank===13) return "K";
+    return String(rank);
+  }
+  function solSuitSymbol(suit){
+    return suit==="S" ? "\u2660" : suit==="H" ? "\u2665" : suit==="D" ? "\u2666" : "\u2663";
+  }
+
+  function openSolitaire(){
+    sol.drawCount = (store.settings && store.settings.solDrawCount) || 1;
+    dealNewSolitaireGame();
+  }
+
+  function dealNewSolitaireGame(){
+    var deck = solShuffle(solBuildDeck());
+    sol.tableau = [[],[],[],[],[],[],[]];
+    sol.foundations = { S:[], H:[], D:[], C:[] };
+    sol.stock = [];
+    sol.waste = [];
+    sol.selected = null;
+    sol.moves = 0;
+    sol.gameOver = false;
+    sol.won = false;
+
+    for (var c=0;c<7;c++){
+      for (var i=0;i<=c;i++){
+        var card = deck.pop();
+        card.faceUp = (i===c);
+        sol.tableau[c].push(card);
+      }
+    }
+    while (deck.length){
+      var card2 = deck.pop();
+      card2.faceUp = false;
+      sol.stock.push(card2);
+    }
+
+    store.solitaireRecord.played++;
+    saveStore();
+
+    updateSolDrawButtons();
+    document.getElementById("solResult").style.display = "none";
+    renderSolitaire();
+    updateSolStatus();
+  }
+
+  // ---- Rules ----
+  // pile[startIndex..end] is a valid movable run if every card is face-up and each
+  // subsequent card is one rank lower and the opposite color of the one before it.
+  function solSequenceValid(col, startIndex){
+    var pile = sol.tableau[col];
+    if (startIndex<0 || startIndex>=pile.length) return false;
+    if (!pile[startIndex].faceUp) return false;
+    for (var i=startIndex; i<pile.length-1; i++){
+      var a = pile[i], b = pile[i+1];
+      if (!b.faceUp) return false;
+      if (b.rank !== a.rank-1) return false;
+      if (solIsRed(a) === solIsRed(b)) return false;
+    }
+    return true;
+  }
+  function solTopCardMovableToFoundation(card){
+    var f = sol.foundations[card.suit];
+    if (card.rank===1) return f.length===0;
+    return f.length>0 && f[f.length-1].rank === card.rank-1;
+  }
+  function solCardMovableToTableauColumn(card, colIndex){
+    var pile = sol.tableau[colIndex];
+    if (pile.length===0) return card.rank===13;
+    var top = pile[pile.length-1];
+    if (!top.faceUp) return false;
+    return top.rank === card.rank+1 && solIsRed(top) !== solIsRed(card);
+  }
+  function solSelectedCard(){
+    if (!sol.selected) return null;
+    if (sol.selected.type==="tableau"){
+      var pile = sol.tableau[sol.selected.col];
+      return pile[sol.selected.index] || null;
+    }
+    if (sol.selected.type==="waste"){
+      return sol.waste.length ? sol.waste[sol.waste.length-1] : null;
+    }
+    return null;
+  }
+  function solSelectionIsSingleCard(){
+    if (!sol.selected) return false;
+    if (sol.selected.type==="waste") return sol.waste.length>0;
+    if (sol.selected.type==="tableau"){
+      var pile = sol.tableau[sol.selected.col];
+      return sol.selected.index === pile.length-1;
+    }
+    return false;
+  }
+  function solColumnIsValidTarget(colIndex){
+    if (!sol.selected) return false;
+    if (sol.selected.type==="tableau" && sol.selected.col===colIndex) return false;
+    var card = solSelectedCard();
+    if (!card) return false;
+    return solCardMovableToTableauColumn(card, colIndex);
+  }
+  function solFoundationIsValidTarget(suit){
+    if (!solSelectionIsSingleCard()) return false;
+    var card = solSelectedCard();
+    return !!card && card.suit===suit && solTopCardMovableToFoundation(card);
+  }
+
+  function flipSolTopIfNeeded(col){
+    var pile = sol.tableau[col];
+    if (pile.length>0 && !pile[pile.length-1].faceUp) pile[pile.length-1].faceUp = true;
+  }
+
+  function solMoveTableauToTableau(fromCol, startIndex, toCol){
+    if (fromCol===toCol) return false;
+    var pile = sol.tableau[fromCol];
+    var moving = pile.slice(startIndex);
+    if (moving.length===0) return false;
+    if (!solCardMovableToTableauColumn(moving[0], toCol)) return false;
+    sol.tableau[fromCol] = pile.slice(0, startIndex);
+    Array.prototype.push.apply(sol.tableau[toCol], moving);
+    flipSolTopIfNeeded(fromCol);
+    sol.moves++;
+    return true;
+  }
+  function solMoveWasteToTableau(toCol){
+    if (sol.waste.length===0) return false;
+    var card = sol.waste[sol.waste.length-1];
+    if (!solCardMovableToTableauColumn(card, toCol)) return false;
+    sol.waste.pop();
+    sol.tableau[toCol].push(card);
+    sol.moves++;
+    return true;
+  }
+  function solMoveToFoundation(source){
+    var card;
+    if (source.type==="tableau"){
+      var pile = sol.tableau[source.col];
+      if (pile.length===0) return false;
+      card = pile[pile.length-1];
+      if (!card.faceUp || !solTopCardMovableToFoundation(card)) return false;
+      pile.pop();
+      sol.foundations[card.suit].push(card);
+      flipSolTopIfNeeded(source.col);
+    } else if (source.type==="waste"){
+      if (sol.waste.length===0) return false;
+      card = sol.waste[sol.waste.length-1];
+      if (!solTopCardMovableToFoundation(card)) return false;
+      sol.waste.pop();
+      sol.foundations[card.suit].push(card);
+    } else return false;
+    sol.moves++;
+    checkSolitaireWin();
+    return true;
+  }
+  function solDrawFromStock(){
+    if (sol.gameOver) return;
+    if (sol.stock.length===0){
+      if (sol.waste.length===0) return;
+      while (sol.waste.length){
+        var c = sol.waste.pop();
+        c.faceUp = false;
+        sol.stock.push(c);
+      }
+      sol.moves++;
+      return;
+    }
+    var n = Math.min(sol.drawCount, sol.stock.length);
+    for (var i=0;i<n;i++){
+      var card = sol.stock.pop();
+      card.faceUp = true;
+      sol.waste.push(card);
+    }
+    sol.moves++;
+  }
+  function checkSolitaireWin(){
+    var total = 0;
+    SUITS.forEach(function(s){ total += sol.foundations[s].length; });
+    if (total === 52){
+      sol.gameOver = true;
+      sol.won = true;
+      store.solitaireRecord.wins++;
+      if (store.solitaireRecord.bestMoves === null || sol.moves < store.solitaireRecord.bestMoves){
+        store.solitaireRecord.bestMoves = sol.moves;
+      }
+      saveStore();
+    }
+  }
+
+  // ---- Interaction (tap select -> tap destination, same language as Checkers) ----
+  function afterSolMove(){
+    renderSolitaire();
+    updateSolStatus();
+    if (sol.won) showSolWinResult();
+  }
+
+  function handleSolCardTap(type, col, index){
+    if (sol.gameOver) return;
+    if (!sol.selected){
+      if (type==="waste"){
+        if (solMoveToFoundation({type:"waste"})){ afterSolMove(); return; }
+        sol.selected = { type:"waste" };
+        renderSolitaire();
+        return;
+      }
+      if (type==="tableau"){
+        var pile = sol.tableau[col];
+        var isTopCard = index === pile.length-1;
+        if (isTopCard && solMoveToFoundation({type:"tableau", col:col})){ afterSolMove(); return; }
+        if (solSequenceValid(col, index)){
+          sol.selected = { type:"tableau", col:col, index:index };
+          renderSolitaire();
+        }
+        return;
+      }
+    } else {
+      var same = (sol.selected.type===type) &&
+        (type==="waste" || (sol.selected.col===col && sol.selected.index===index));
+      if (same){ sol.selected = null; renderSolitaire(); return; }
+
+      if (type==="tableau"){
+        var moved = sol.selected.type==="tableau"
+          ? solMoveTableauToTableau(sol.selected.col, sol.selected.index, col)
+          : solMoveWasteToTableau(col);
+        if (moved){ sol.selected = null; afterSolMove(); return; }
+        if (solSequenceValid(col, index)){
+          sol.selected = { type:"tableau", col:col, index:index };
+          renderSolitaire();
+          return;
+        }
+        sol.selected = null;
+        renderSolitaire();
+        return;
+      }
+      if (type==="waste"){
+        sol.selected = sol.waste.length ? { type:"waste" } : null;
+        renderSolitaire();
+      }
+    }
+  }
+  function handleSolColumnDropTap(colIndex){
+    if (sol.gameOver || !sol.selected) return;
+    var moved = sol.selected.type==="tableau"
+      ? solMoveTableauToTableau(sol.selected.col, sol.selected.index, colIndex)
+      : solMoveWasteToTableau(colIndex);
+    sol.selected = null;
+    if (moved) afterSolMove(); else renderSolitaire();
+  }
+  function handleSolFoundationTap(suit){
+    if (sol.gameOver || !sol.selected) return;
+    var moved = false;
+    if (sol.selected.type==="tableau" && solSelectionIsSingleCard()){
+      moved = solMoveToFoundation({ type:"tableau", col:sol.selected.col });
+    } else if (sol.selected.type==="waste"){
+      moved = solMoveToFoundation({ type:"waste" });
+    }
+    sol.selected = null;
+    if (moved) afterSolMove(); else renderSolitaire();
+  }
+  function handleSolStockTap(){
+    if (sol.gameOver) return;
+    solDrawFromStock();
+    sol.selected = null;
+    renderSolitaire();
+    updateSolStatus();
+  }
+
+  // ---- Rendering ----
+  function updateSolStatus(){
+    var el = document.getElementById("solStatus");
+    el.innerHTML = sol.gameOver && sol.won
+      ? ("<b>Solved!</b> " + sol.moves + " moves.")
+      : ("Moves: <b>" + sol.moves + "</b>");
+  }
+  function updateSolDrawButtons(){
+    document.getElementById("solDraw1Btn").classList.toggle("active", sol.drawCount===1);
+    document.getElementById("solDraw3Btn").classList.toggle("active", sol.drawCount===3);
+  }
+  function showSolWinResult(){
+    var box = document.getElementById("solResult");
+    box.innerHTML = '<div class="result-headline perfect">Solved!</div>' +
+      '<div class="result-sub">Finished in ' + sol.moves + ' moves.</div>';
+    box.style.display = "block";
+  }
+  function buildSolCardEl(card, selectableFlag, selectedFlag){
+    var el = document.createElement("div");
+    el.className = "sol-card" + (card.faceUp ? (solIsRed(card) ? " red" : " black") : " facedown")
+      + (selectableFlag ? " selectable" : "") + (selectedFlag ? " selected" : "");
+    if (card.faceUp){
+      el.innerHTML = '<div>' + solRankLabel(card.rank) + '</div><div class="sol-suit">' + solSuitSymbol(card.suit) + '</div>';
+    }
+    return el;
+  }
+  function renderSolitaire(){
+    renderSolTopRow();
+    renderSolTableau();
+  }
+  function renderSolTopRow(){
+    var row = document.getElementById("solTopRow");
+    row.innerHTML = "";
+
+    var stockPile = document.createElement("div");
+    stockPile.className = "sol-pile";
+    if (sol.stock.length>0){
+      stockPile.appendChild(buildSolCardEl({ faceUp:false }, false, false));
+      var countEl = document.createElement("div");
+      countEl.className = "sol-stock-count";
+      countEl.textContent = String(sol.stock.length);
+      stockPile.appendChild(countEl);
+    } else if (sol.waste.length>0){
+      var hint = document.createElement("div");
+      hint.className = "sol-pile-hint";
+      hint.textContent = "\u21BA";
+      stockPile.appendChild(hint);
+    }
+    stockPile.addEventListener("click", handleSolStockTap);
+    row.appendChild(stockPile);
+
+    var wastePile = document.createElement("div");
+    wastePile.className = "sol-pile";
+    if (sol.waste.length>0){
+      var showCount = Math.min(3, sol.waste.length);
+      for (var i=showCount-1;i>=0;i--){
+        var wc = sol.waste[sol.waste.length-1-i];
+        var isTop = i===0;
+        var wEl = buildSolCardEl(wc, isTop, isTop && sol.selected && sol.selected.type==="waste");
+        wEl.style.left = ((showCount-1-i) * 14) + "%";
+        wEl.style.zIndex = String(10+i);
+        if (isTop){
+          wEl.addEventListener("click", function(e){ e.stopPropagation(); handleSolCardTap("waste"); });
+        }
+        wastePile.appendChild(wEl);
+      }
+    }
+    row.appendChild(wastePile);
+
+    var spacer = document.createElement("div");
+    spacer.className = "sol-spacer";
+    row.appendChild(spacer);
+
+    SUITS.forEach(function(suit){
+      var fPile = document.createElement("div");
+      fPile.className = "sol-pile";
+      var stack = sol.foundations[suit];
+      if (stack.length>0){
+        fPile.appendChild(buildSolCardEl(stack[stack.length-1], false, false));
+      } else {
+        var hint2 = document.createElement("div");
+        hint2.className = "sol-pile-hint";
+        hint2.textContent = solSuitSymbol(suit);
+        fPile.appendChild(hint2);
+      }
+      if (solFoundationIsValidTarget(suit)) fPile.classList.add("targetable");
+      fPile.addEventListener("click", function(){ handleSolFoundationTap(suit); });
+      row.appendChild(fPile);
+    });
+  }
+  function renderSolTableau(){
+    var container = document.getElementById("solTableau");
+    container.innerHTML = "";
+    for (var c=0;c<7;c++){
+      (function(colIndex){
+        var colEl = document.createElement("div");
+        colEl.className = "sol-column";
+        colEl.addEventListener("click", function(){ handleSolColumnDropTap(colIndex); });
+        container.appendChild(colEl);
+
+        var pile = sol.tableau[colIndex];
+        var colWidth = colEl.getBoundingClientRect().width || 46;
+        var cardH = colWidth / 0.7;
+        var faceDownStep = cardH * 0.16;
+        var faceUpStep = cardH * 0.30;
+
+        if (solColumnIsValidTarget(colIndex)) colEl.classList.add("targetable");
+
+        if (pile.length === 0){
+          colEl.style.height = cardH + "px";
+          return;
+        }
+        var top = 0;
+        pile.forEach(function(card, idx){
+          var selectableFlag = card.faceUp && solSequenceValid(colIndex, idx);
+          var selectedFlag = !!sol.selected && sol.selected.type==="tableau" && sol.selected.col===colIndex && idx >= sol.selected.index;
+          var cardEl = buildSolCardEl(card, selectableFlag, selectedFlag);
+          cardEl.style.top = top + "px";
+          cardEl.style.zIndex = String(idx+1);
+          (function(cIdx, cardIndex){
+            cardEl.addEventListener("click", function(e){
+              e.stopPropagation();
+              handleSolCardTap("tableau", cIdx, cardIndex);
+            });
+          })(colIndex, idx);
+          colEl.appendChild(cardEl);
+          top += card.faceUp ? faceUpStep : faceDownStep;
+        });
+        var lastStep = pile[pile.length-1].faceUp ? faceUpStep : faceDownStep;
+        colEl.style.height = Math.max(cardH, (top - lastStep) + cardH) + "px";
+      })(c);
+    }
+  }
+
+  document.getElementById("solBackBtn").addEventListener("click", function(){ showPage("favoritesPage"); });
+  document.getElementById("solNewGameBtn").addEventListener("click", function(){ dealNewSolitaireGame(); });
+  document.getElementById("solDraw1Btn").addEventListener("click", function(){
+    sol.drawCount = 1; store.settings.solDrawCount = 1; saveStore(); updateSolDrawButtons();
+  });
+  document.getElementById("solDraw3Btn").addEventListener("click", function(){
+    sol.drawCount = 3; store.settings.solDrawCount = 3; saveStore(); updateSolDrawButtons();
+  });
 
   // ================= THAT ONE AD (endless dodge) =================
   var roadCanvas = document.getElementById("roadCanvas");
