@@ -189,7 +189,8 @@
   .sol-card{
     position:absolute; left:0; width:100%; aspect-ratio:0.7; border-radius:7px;
     background:#F7F5F0; box-shadow:0 2px 4px rgba(0,0,0,0.28), inset 0 0 0 1px rgba(0,0,0,0.10);
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start;
+    padding:6% 0 0 9%; box-sizing:border-box;
     font-weight:800; font-size:clamp(10px,3vw,14px); cursor:pointer; user-select:none; -webkit-user-select:none;
     line-height:1.05; transition:box-shadow .12s ease;
   }
@@ -1854,8 +1855,8 @@
     var gap = 6;
     var colWidth = (containerWidth - gap*6) / 7;
     var cardH = colWidth / 0.7;
-    var faceDownStep = cardH * 0.16;
-    var faceUpStep = cardH * 0.30;
+    var faceDownStep = cardH * 0.24;
+    var faceUpStep = cardH * 0.40;
     for (var c=0;c<7;c++){
       (function(colIndex){
         var colEl = document.createElement("div");
