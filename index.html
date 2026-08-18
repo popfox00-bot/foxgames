@@ -349,7 +349,7 @@
   .tm-grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:5px; max-width:380px; margin:0 auto; }
   .tm-tile{
     aspect-ratio:1; border-radius:8px;
-    background:#F5EEDC;
+    background:#FFF3D6;
     display:flex; align-items:center; justify-content:center;
     font-size:clamp(15px,4.2vw,22px); cursor:pointer; user-select:none; -webkit-user-select:none;
     transition:box-shadow .15s ease;
@@ -492,12 +492,12 @@
         <div class="road-overlay-card">
           <div class="road-overlay-title" id="tmOverlayTitle">All matched!</div>
           <div class="road-overlay-sub" id="tmOverlaySub"></div>
-          <button class="text-btn" id="tmPlayAgainBtn">Play Again</button>
+          <div id="tmOverlayButtons"></div>
         </div>
       </div>
     </div>
 
-    <button class="text-btn" id="tmNewGameBtn">New Game</button>
+    <button class="text-btn" id="tmNewGameBtn">Change Difficulty</button>
   </div>
 
   <div id="roadPage" class="page">
@@ -608,7 +608,7 @@
   "use strict";
 
   var STORAGE_KEY = "foxGames";
-  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, longestTimes: {}, checkersRecord: { wins:0, losses:0, totalMovesInWins:0, movesTrackedWins:0 }, solitaireRecord: { wins:0, played:0, bestMoves:null }, tileMatchRecord: { played:0, bestTimeMs:null, bestPoints:0 } };
+  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, longestTimes: {}, checkersRecord: { wins:0, losses:0, totalMovesInWins:0, movesTrackedWins:0 }, solitaireRecord: { wins:0, played:0, bestMoves:null }, tileMatchRecord: { easy:{ played:0, bestTimeMs:null, bestPoints:0 }, medium:{ played:0, bestTimeMs:null, bestPoints:0 }, hard:{ played:0, bestTimeMs:null, bestPoints:0 } } };
 
   function loadStore(){
     try{
@@ -626,10 +626,18 @@
         if (store.solitaireRecord.wins === undefined) store.solitaireRecord.wins = 0;
         if (store.solitaireRecord.played === undefined) store.solitaireRecord.played = 0;
         if (store.solitaireRecord.bestMoves === undefined) store.solitaireRecord.bestMoves = null;
-        if (!store.tileMatchRecord) store.tileMatchRecord = { played:0, bestTimeMs:null, bestPoints:0 };
-        if (store.tileMatchRecord.played === undefined) store.tileMatchRecord.played = 0;
-        if (store.tileMatchRecord.bestTimeMs === undefined) store.tileMatchRecord.bestTimeMs = null;
-        if (store.tileMatchRecord.bestPoints === undefined) store.tileMatchRecord.bestPoints = 0;
+        if (!store.tileMatchRecord) store.tileMatchRecord = {};
+        // migrate a pre-difficulty flat record (old shape) into the "hard" bucket,
+        // since 6x7/21-pair was the only mode that existed before difficulty tiers.
+        if (store.tileMatchRecord.played !== undefined && !store.tileMatchRecord.hard){
+          store.tileMatchRecord = { easy:{played:0,bestTimeMs:null,bestPoints:0}, medium:{played:0,bestTimeMs:null,bestPoints:0}, hard: store.tileMatchRecord };
+        }
+        ["easy","medium","hard"].forEach(function(k){
+          if (!store.tileMatchRecord[k]) store.tileMatchRecord[k] = { played:0, bestTimeMs:null, bestPoints:0 };
+          if (store.tileMatchRecord[k].played === undefined) store.tileMatchRecord[k].played = 0;
+          if (store.tileMatchRecord[k].bestTimeMs === undefined) store.tileMatchRecord[k].bestTimeMs = null;
+          if (store.tileMatchRecord[k].bestPoints === undefined) store.tileMatchRecord[k].bestPoints = 0;
+        });
       }
     }catch(e){}
   }
@@ -931,13 +939,49 @@
       statCardHtml(solWins, "Wins") + statCardHtml(solWinPct + "%", "Win Rate") + statCardHtml(solBest !== null ? solBest : "\u2014", "Fewest Moves to Win"),
       null);
 
-    // Tile Match: games completed, fastest time, and the best points score achieved
-    var tmRec = store.tileMatchRecord;
-    out += statSectionHtml("tilematch", "Tile Match",
-      statCardHtml(tmRec.played, "Games Played") + statCardHtml(tmRec.bestTimeMs !== null ? fmtTime(tmRec.bestTimeMs) : "\u2014", "Best Time") + statCardHtml(tmRec.bestPoints, "Best Points"),
-      null);
-
     document.getElementById("statsBody").innerHTML = out;
+    renderTileMatchStatsSection();
+  }
+
+  // Tile Match's stats need an interactive difficulty filter, so unlike the other
+  // sections (built as a plain HTML string) this one is built as real DOM nodes with
+  // working click handlers, then appended after the rest of the page is set.
+  function renderTileMatchStatsSection(){
+    if (!tmStatsFilter){
+      tmStatsFilter = (store.settings && store.settings.tileMatchDifficulty) || "easy";
+    }
+    var container = document.createElement("div");
+
+    var game = GAMES.filter(function(g){ return g.id === "tilematch"; })[0];
+    var titleRow = document.createElement("div");
+    titleRow.className = "section-title-row";
+    titleRow.innerHTML = '<div class="stat-section-icon">' + (game ? game.icon : "") + '</div><div class="section-title">Tile Match</div>';
+    container.appendChild(titleRow);
+
+    var filterWrap = document.createElement("div");
+    filterWrap.className = "theme-toggle";
+    filterWrap.style.marginBottom = "10px";
+    TM_DIFFICULTIES.forEach(function(d){
+      var btn = document.createElement("button");
+      btn.className = "theme-btn" + (tmStatsFilter === d.id ? " active" : "");
+      btn.textContent = d.label;
+      btn.addEventListener("click", function(){
+        tmStatsFilter = d.id;
+        renderStats();
+      });
+      filterWrap.appendChild(btn);
+    });
+    container.appendChild(filterWrap);
+
+    var rec = store.tileMatchRecord[tmStatsFilter] || { played:0, bestTimeMs:null, bestPoints:0 };
+    var statRow = document.createElement("div");
+    statRow.className = "stat-row";
+    statRow.innerHTML = statCardHtml(rec.played, "Games Played")
+      + statCardHtml(rec.bestTimeMs !== null ? fmtTime(rec.bestTimeMs) : "\u2014", "Best Time")
+      + statCardHtml(rec.bestPoints, "Best Points");
+    container.appendChild(statRow);
+
+    document.getElementById("statsBody").appendChild(container);
   }
 
   // ================= BEST MOVE (CHESS) ENGINE =================
@@ -3106,20 +3150,27 @@
 
   // ================= TILE MATCH ENGINE =================
   var TM_EMOJI = ["🍎","🍌","🍇","🍉","🍓","🍒","🥝","🍍","🥥","🍑","🍋","🥑","🍆","🌽","🥕","🍔","🍕","🌮","🍩","🎂","🍦"];
-  var TM_PAIRS = TM_EMOJI.length; // 21 pairs = 42 tiles
-  var TM_REVEAL_PAUSE_MS = 2500;
+  var TM_DIFFICULTIES = [
+    { id:"easy",   label:"Easy",   cols:4, pairs:10 },
+    { id:"medium", label:"Medium", cols:5, pairs:15 },
+    { id:"hard",   label:"Hard",   cols:6, pairs:21 }
+  ];
+  var TM_REVEAL_PAUSE_MS = 1500;
   var TM_STREAK_BONUS = 2;
 
   var tm = {
+    difficulty: "easy", pairs: 10,
     board: [], firstIndex: null, secondIndex: null, locked: false,
     matchesFound: 0, points: 0, streak: 0,
     startTimestamp: 0, lastMatchTimestamp: 0, elapsedMs: 0,
     timerInterval: null, gameOver: false
   };
   var tmMsgTimeout = null;
+  var tmStatsFilter = null; // which difficulty's stats Statistics is currently showing
 
-  function buildTileMatchDeck(){
-    var deck = TM_EMOJI.concat(TM_EMOJI); // 42 items, each emoji appears twice
+  function buildTileMatchDeck(pairCount){
+    var pool = TM_EMOJI.slice(0, pairCount);
+    var deck = pool.concat(pool);
     for (var i = deck.length - 1; i > 0; i--){
       var j = Math.floor(Math.random() * (i + 1));
       var t = deck[i]; deck[i] = deck[j]; deck[j] = t;
@@ -3127,8 +3178,45 @@
     return deck.map(function(e){ return { emoji: e, state: "hidden" }; });
   }
 
+  // Entry point from Favorites/New Games — always opens on the difficulty picker.
   function openTileMatch(){
-    tm.board = buildTileMatchDeck();
+    tm.difficulty = (store.settings && store.settings.tileMatchDifficulty) || "easy";
+    showTmDifficultyPicker();
+  }
+
+  function showTmDifficultyPicker(){
+    stopTileMatch();
+    document.getElementById("tmGrid").innerHTML = "";
+    document.getElementById("tmTimer").textContent = "0:00";
+    document.getElementById("tmPoints").textContent = "0";
+    showTmMessage("");
+
+    document.getElementById("tmOverlayTitle").textContent = "Tile Match";
+    document.getElementById("tmOverlaySub").textContent = "Choose a difficulty to begin.";
+    var row = document.createElement("div");
+    row.className = "road-diff-row";
+    TM_DIFFICULTIES.forEach(function(d){
+      var btn = document.createElement("button");
+      btn.className = "road-diff-btn" + (tm.difficulty === d.id ? " selected" : "");
+      btn.textContent = d.label + " — " + d.pairs + " pairs";
+      btn.addEventListener("click", function(){
+        store.settings.tileMatchDifficulty = d.id;
+        saveStore();
+        startTileMatchGame(d.id);
+      });
+      row.appendChild(btn);
+    });
+    var btnsEl = document.getElementById("tmOverlayButtons");
+    btnsEl.innerHTML = "";
+    btnsEl.appendChild(row);
+    document.getElementById("tmOverlay").style.display = "flex";
+  }
+
+  function startTileMatchGame(difficultyId){
+    var cfg = TM_DIFFICULTIES.filter(function(d){ return d.id === difficultyId; })[0] || TM_DIFFICULTIES[0];
+    tm.difficulty = cfg.id;
+    tm.pairs = cfg.pairs;
+    tm.board = buildTileMatchDeck(cfg.pairs);
     tm.firstIndex = null;
     tm.secondIndex = null;
     tm.locked = false;
@@ -3140,6 +3228,7 @@
     tm.lastMatchTimestamp = tm.startTimestamp;
     tm.elapsedMs = 0;
 
+    document.getElementById("tmGrid").style.gridTemplateColumns = "repeat(" + cfg.cols + ",1fr)";
     document.getElementById("tmOverlay").style.display = "none";
     showTmMessage("");
     updateTmScoreDisplay();
@@ -3224,13 +3313,13 @@
 
       if (isMatch){
         tm.matchesFound++;
-        if (tm.matchesFound === TM_PAIRS) finishTileMatch();
+        if (tm.matchesFound === tm.pairs) finishTileMatch();
       }
     }, TM_REVEAL_PAUSE_MS);
   }
 
   // Scored on how long it took to FIND the match (from the last successful match to the
-  // moment the second tile was clicked) — the 4s evaluation pause itself isn't held against you.
+  // moment the second tile was clicked) — the evaluation pause itself isn't held against you.
   function resolveTmMatch(matchTimestamp){
     var elapsed = matchTimestamp - tm.lastMatchTimestamp;
     var pts;
@@ -3262,23 +3351,35 @@
     tm.elapsedMs = Date.now() - tm.startTimestamp;
     document.getElementById("tmTimer").textContent = fmtTime(tm.elapsedMs);
 
-    store.tileMatchRecord.played++;
-    if (store.tileMatchRecord.bestTimeMs === null || tm.elapsedMs < store.tileMatchRecord.bestTimeMs){
-      store.tileMatchRecord.bestTimeMs = tm.elapsedMs;
-    }
-    if (tm.points > store.tileMatchRecord.bestPoints){
-      store.tileMatchRecord.bestPoints = tm.points;
-    }
+    var rec = store.tileMatchRecord[tm.difficulty];
+    rec.played++;
+    if (rec.bestTimeMs === null || tm.elapsedMs < rec.bestTimeMs) rec.bestTimeMs = tm.elapsedMs;
+    if (tm.points > rec.bestPoints) rec.bestPoints = tm.points;
     saveStore();
 
     document.getElementById("tmOverlayTitle").textContent = "All matched!";
     document.getElementById("tmOverlaySub").textContent = "Finished in " + fmtTime(tm.elapsedMs) + " with " + tm.points + " points.";
+
+    var row = document.createElement("div");
+    row.className = "road-choice-row";
+    var again = document.createElement("button");
+    again.className = "road-choice-btn primary";
+    again.textContent = "Play Again";
+    again.addEventListener("click", function(){ startTileMatchGame(tm.difficulty); });
+    var change = document.createElement("button");
+    change.className = "road-choice-btn secondary";
+    change.textContent = "Change Difficulty";
+    change.addEventListener("click", showTmDifficultyPicker);
+    row.appendChild(again);
+    row.appendChild(change);
+    var btnsEl = document.getElementById("tmOverlayButtons");
+    btnsEl.innerHTML = "";
+    btnsEl.appendChild(row);
     document.getElementById("tmOverlay").style.display = "flex";
   }
 
   document.getElementById("tmBackBtn").addEventListener("click", function(){ showPage("favoritesPage"); });
-  document.getElementById("tmNewGameBtn").addEventListener("click", openTileMatch);
-  document.getElementById("tmPlayAgainBtn").addEventListener("click", openTileMatch);
+  document.getElementById("tmNewGameBtn").addEventListener("click", showTmDifficultyPicker);
 
   loadStore();
   ensureFavorites();
