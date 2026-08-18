@@ -338,6 +338,26 @@
   .road-diff-row{ display:flex; flex-direction:column; gap:8px; width:220px; }
   .road-diff-btn{ border:none; background:rgba(255,255,255,0.12); color:#fff; font-weight:700; font-size:13.5px; padding:12px; border-radius:11px; cursor:pointer; }
   .road-diff-btn.selected{ background:var(--accent); }
+
+  /* ---- Tile Match ---- */
+  .tm-status-row{ display:flex; gap:14px; margin-bottom:6px; }
+  .tm-stat{ flex:1; background:var(--panel); border-radius:14px; padding:14px 16px; text-align:center; box-shadow: inset 0 0 0 1px var(--rule); }
+  .tm-stat-num{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:24px; font-weight:700; color:var(--accent); }
+  .tm-stat-label{ font-size:10.5px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-top:2px; }
+  .tm-message{ text-align:center; font-size:12.5px; font-weight:700; color:var(--good); min-height:18px; margin:10px 0; }
+  .tm-wrap{ position:relative; background:#3D6C99; border-radius:16px; padding:12px; }
+  .tm-grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:5px; max-width:380px; margin:0 auto; }
+  .tm-tile{
+    aspect-ratio:1; border-radius:8px;
+    background:#F5EEDC;
+    display:flex; align-items:center; justify-content:center;
+    font-size:clamp(15px,4.2vw,22px); cursor:pointer; user-select:none; -webkit-user-select:none;
+    transition:box-shadow .15s ease;
+  }
+  .tm-tile.hidden{ box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
+  .tm-tile.revealed{ box-shadow: inset 0 0 0 3px var(--accent); }
+  .tm-tile.matched{ box-shadow: inset 0 0 0 3px #3EA35A; cursor:default; }
+  #tmNewGameBtn{ max-width:380px; margin-left:auto; margin-right:auto; display:block; }
   .road-choice-row{ display:flex; flex-direction:column; gap:8px; width:220px; }
   .road-choice-btn{ border:none; padding:13px; border-radius:11px; font-weight:700; font-size:13.5px; cursor:pointer; }
   .road-choice-btn.primary{ background:var(--accent); color:#fff; }
@@ -441,6 +461,43 @@
       <button class="text-btn" id="solHintBtn" style="margin-top:0;">Hint</button>
       <button class="text-btn" id="solNewGameBtn" style="margin-top:0;">New Game</button>
     </div>
+  </div>
+
+  <div id="tileMatchPage" class="page">
+    <div class="top-bar">
+      <button class="icon-btn" id="tmBackBtn" aria-label="Back">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+      </button>
+      <div>
+        <p class="eyebrow">Memory Game</p>
+        <h1 style="margin-bottom:0;">Tile Match</h1>
+      </div>
+    </div>
+
+    <div class="tm-status-row">
+      <div class="tm-stat">
+        <div class="tm-stat-num" id="tmTimer">0:00</div>
+        <div class="tm-stat-label">Time</div>
+      </div>
+      <div class="tm-stat">
+        <div class="tm-stat-num" id="tmPoints">0</div>
+        <div class="tm-stat-label">Points</div>
+      </div>
+    </div>
+    <div class="tm-message" id="tmMessage">&nbsp;</div>
+
+    <div class="tm-wrap" id="tmWrap">
+      <div class="tm-grid" id="tmGrid"></div>
+      <div class="road-overlay" id="tmOverlay" style="display:none;">
+        <div class="road-overlay-card">
+          <div class="road-overlay-title" id="tmOverlayTitle">All matched!</div>
+          <div class="road-overlay-sub" id="tmOverlaySub"></div>
+          <button class="text-btn" id="tmPlayAgainBtn">Play Again</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="text-btn" id="tmNewGameBtn">New Game</button>
   </div>
 
   <div id="roadPage" class="page">
@@ -551,7 +608,7 @@
   "use strict";
 
   var STORAGE_KEY = "foxGames";
-  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, longestTimes: {}, checkersRecord: { wins:0, losses:0, totalMovesInWins:0, movesTrackedWins:0 }, solitaireRecord: { wins:0, played:0, bestMoves:null } };
+  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, longestTimes: {}, checkersRecord: { wins:0, losses:0, totalMovesInWins:0, movesTrackedWins:0 }, solitaireRecord: { wins:0, played:0, bestMoves:null }, tileMatchRecord: { played:0, bestTimeMs:null, bestPoints:0 } };
 
   function loadStore(){
     try{
@@ -569,6 +626,10 @@
         if (store.solitaireRecord.wins === undefined) store.solitaireRecord.wins = 0;
         if (store.solitaireRecord.played === undefined) store.solitaireRecord.played = 0;
         if (store.solitaireRecord.bestMoves === undefined) store.solitaireRecord.bestMoves = null;
+        if (!store.tileMatchRecord) store.tileMatchRecord = { played:0, bestTimeMs:null, bestPoints:0 };
+        if (store.tileMatchRecord.played === undefined) store.tileMatchRecord.played = 0;
+        if (store.tileMatchRecord.bestTimeMs === undefined) store.tileMatchRecord.bestTimeMs = null;
+        if (store.tileMatchRecord.bestPoints === undefined) store.tileMatchRecord.bestPoints = 0;
       }
     }catch(e){}
   }
@@ -617,6 +678,9 @@
     },
     { id:"solitaire", name:"Solitaire", page:"solitairePage", defaultFavorite:false, icon:
       '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="10" height="14" rx="1.6"/><path d="M18 7h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1v-2" fill="none"/><path d="M9 8l1.6 3.2h-3.2z" fill="white" stroke="none"/></svg>'
+    },
+    { id:"tilematch", name:"Tile Match", page:"tileMatchPage", defaultFavorite:false, icon:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.2"/><rect x="14" y="14" width="7" height="7" rx="1.2" fill="white"/></svg>'
     }
   ];
   function ensureFavorites(){
@@ -667,7 +731,7 @@
   }
 
   // ================= NAVIGATION =================
-  var pages = ["favoritesPage","newGamesPage","statsPage","settingsPage","chessPage","checkersPage","roadPage","spellingbeePage","dailyFivePage","solitairePage"];
+  var pages = ["favoritesPage","newGamesPage","statsPage","settingsPage","chessPage","checkersPage","roadPage","spellingbeePage","dailyFivePage","solitairePage","tileMatchPage"];
   function showPage(id){
     pages.forEach(function(p){ document.getElementById(p).classList.toggle("active", p===id); });
     ["tabFavorites","tabNewGames","tabStats","tabSettings"].forEach(function(t){
@@ -678,6 +742,7 @@
     if (id === "newGamesPage") renderNewGames();
     if (id === "settingsPage") renderGameSettings();
     if (id !== "roadPage") stopRoadGame();
+    if (id !== "tileMatchPage") stopTileMatch();
   }
   document.querySelectorAll(".tab-btn").forEach(function(btn){
     btn.addEventListener("click", function(){ showPage(btn.dataset.page); });
@@ -691,6 +756,7 @@
     else if (g.id === "spellingbee") openSpellingBee();
     else if (g.id === "dailyfive") openDailyFive();
     else if (g.id === "solitaire") openSolitaire();
+    else if (g.id === "tilematch") openTileMatch();
   }
 
   // ================= FAVORITES / NEW GAMES (shared heart-tile rendering) =================
@@ -863,6 +929,12 @@
     var solBest = store.solitaireRecord.bestMoves;
     out += statSectionHtml("solitaire", "Solitaire",
       statCardHtml(solWins, "Wins") + statCardHtml(solWinPct + "%", "Win Rate") + statCardHtml(solBest !== null ? solBest : "\u2014", "Fewest Moves to Win"),
+      null);
+
+    // Tile Match: games completed, fastest time, and the best points score achieved
+    var tmRec = store.tileMatchRecord;
+    out += statSectionHtml("tilematch", "Tile Match",
+      statCardHtml(tmRec.played, "Games Played") + statCardHtml(tmRec.bestTimeMs !== null ? fmtTime(tmRec.bestTimeMs) : "\u2014", "Best Time") + statCardHtml(tmRec.bestPoints, "Best Points"),
       null);
 
     document.getElementById("statsBody").innerHTML = out;
@@ -3031,6 +3103,182 @@
     var k = e.key.toLowerCase();
     if (k.length === 1 && k >= "a" && k <= "z") appendDfLetter(k);
   });
+
+  // ================= TILE MATCH ENGINE =================
+  var TM_EMOJI = ["🍎","🍌","🍇","🍉","🍓","🍒","🥝","🍍","🥥","🍑","🍋","🥑","🍆","🌽","🥕","🍔","🍕","🌮","🍩","🎂","🍦"];
+  var TM_PAIRS = TM_EMOJI.length; // 21 pairs = 42 tiles
+  var TM_REVEAL_PAUSE_MS = 2500;
+  var TM_STREAK_BONUS = 2;
+
+  var tm = {
+    board: [], firstIndex: null, secondIndex: null, locked: false,
+    matchesFound: 0, points: 0, streak: 0,
+    startTimestamp: 0, lastMatchTimestamp: 0, elapsedMs: 0,
+    timerInterval: null, gameOver: false
+  };
+  var tmMsgTimeout = null;
+
+  function buildTileMatchDeck(){
+    var deck = TM_EMOJI.concat(TM_EMOJI); // 42 items, each emoji appears twice
+    for (var i = deck.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = deck[i]; deck[i] = deck[j]; deck[j] = t;
+    }
+    return deck.map(function(e){ return { emoji: e, state: "hidden" }; });
+  }
+
+  function openTileMatch(){
+    tm.board = buildTileMatchDeck();
+    tm.firstIndex = null;
+    tm.secondIndex = null;
+    tm.locked = false;
+    tm.matchesFound = 0;
+    tm.points = 0;
+    tm.streak = 0;
+    tm.gameOver = false;
+    tm.startTimestamp = Date.now();
+    tm.lastMatchTimestamp = tm.startTimestamp;
+    tm.elapsedMs = 0;
+
+    document.getElementById("tmOverlay").style.display = "none";
+    showTmMessage("");
+    updateTmScoreDisplay();
+    renderTmGrid();
+
+    if (tm.timerInterval) clearInterval(tm.timerInterval);
+    tm.timerInterval = setInterval(function(){
+      if (tm.gameOver) return;
+      tm.elapsedMs = Date.now() - tm.startTimestamp;
+      document.getElementById("tmTimer").textContent = fmtTime(tm.elapsedMs);
+    }, 500);
+  }
+
+  function stopTileMatch(){
+    if (tm.timerInterval){ clearInterval(tm.timerInterval); tm.timerInterval = null; }
+  }
+
+  function renderTmGrid(){
+    var grid = document.getElementById("tmGrid");
+    grid.innerHTML = "";
+    tm.board.forEach(function(tile, i){
+      var el = document.createElement("div");
+      el.className = "tm-tile " + tile.state;
+      el.textContent = tile.state === "hidden" ? "" : tile.emoji;
+      el.addEventListener("click", function(){ handleTmTileClick(i); });
+      grid.appendChild(el);
+    });
+  }
+  function renderTmTile(i){
+    var grid = document.getElementById("tmGrid");
+    var el = grid.children[i];
+    var tile = tm.board[i];
+    el.className = "tm-tile " + tile.state;
+    el.textContent = tile.state === "hidden" ? "" : tile.emoji;
+  }
+
+  function showTmMessage(text){
+    var el = document.getElementById("tmMessage");
+    el.textContent = text || "\u00A0";
+    if (tmMsgTimeout) clearTimeout(tmMsgTimeout);
+    if (text) tmMsgTimeout = setTimeout(function(){ el.textContent = "\u00A0"; }, 2600);
+  }
+  function updateTmScoreDisplay(){
+    document.getElementById("tmPoints").textContent = tm.points;
+  }
+
+  function handleTmTileClick(i){
+    if (tm.locked || tm.gameOver) return;
+    var tile = tm.board[i];
+    if (tile.state !== "hidden") return;
+
+    tile.state = "revealed";
+    renderTmTile(i);
+
+    if (tm.firstIndex === null){
+      tm.firstIndex = i;
+      return;
+    }
+    if (i === tm.firstIndex) return;
+
+    tm.secondIndex = i;
+    tm.locked = true;
+    var isMatch = tm.board[tm.firstIndex].emoji === tm.board[tm.secondIndex].emoji;
+    var clickTimestamp = Date.now(); // the moment the match was actually found, before the pause
+
+    var fIdx = tm.firstIndex, sIdx = tm.secondIndex;
+    setTimeout(function(){
+      if (isMatch){
+        tm.board[fIdx].state = "matched";
+        tm.board[sIdx].state = "matched";
+        resolveTmMatch(clickTimestamp);
+      } else {
+        tm.board[fIdx].state = "hidden";
+        tm.board[sIdx].state = "hidden";
+        tm.streak = 0;
+      }
+      renderTmTile(fIdx);
+      renderTmTile(sIdx);
+      tm.firstIndex = null;
+      tm.secondIndex = null;
+      tm.locked = false;
+
+      if (isMatch){
+        tm.matchesFound++;
+        if (tm.matchesFound === TM_PAIRS) finishTileMatch();
+      }
+    }, TM_REVEAL_PAUSE_MS);
+  }
+
+  // Scored on how long it took to FIND the match (from the last successful match to the
+  // moment the second tile was clicked) — the 4s evaluation pause itself isn't held against you.
+  function resolveTmMatch(matchTimestamp){
+    var elapsed = matchTimestamp - tm.lastMatchTimestamp;
+    var pts;
+    if (elapsed <= 10000) pts = 5;
+    else if (elapsed <= 15000) pts = 4;
+    else if (elapsed <= 20000) pts = 3;
+    else if (elapsed <= 30000) pts = 2;
+    else if (elapsed <= 60000) pts = 1;
+    else pts = 0;
+
+    tm.streak++;
+    var msg = "+" + pts + " point" + (pts === 1 ? "" : "s");
+    // A 2+ streak triggers the bonus every match from the 2nd consecutive one onward —
+    // so a 3-in-a-row streak fires it twice (at match 2 and again at match 3), matching
+    // "three in a row counts as two consecutive two-in-a-rows."
+    if (tm.streak >= 2){
+      pts += TM_STREAK_BONUS;
+      msg += " (+" + TM_STREAK_BONUS + " *Match Streak Bonus*)";
+    }
+    tm.points += pts;
+    tm.lastMatchTimestamp = matchTimestamp;
+    showTmMessage(msg);
+    updateTmScoreDisplay();
+  }
+
+  function finishTileMatch(){
+    tm.gameOver = true;
+    stopTileMatch();
+    tm.elapsedMs = Date.now() - tm.startTimestamp;
+    document.getElementById("tmTimer").textContent = fmtTime(tm.elapsedMs);
+
+    store.tileMatchRecord.played++;
+    if (store.tileMatchRecord.bestTimeMs === null || tm.elapsedMs < store.tileMatchRecord.bestTimeMs){
+      store.tileMatchRecord.bestTimeMs = tm.elapsedMs;
+    }
+    if (tm.points > store.tileMatchRecord.bestPoints){
+      store.tileMatchRecord.bestPoints = tm.points;
+    }
+    saveStore();
+
+    document.getElementById("tmOverlayTitle").textContent = "All matched!";
+    document.getElementById("tmOverlaySub").textContent = "Finished in " + fmtTime(tm.elapsedMs) + " with " + tm.points + " points.";
+    document.getElementById("tmOverlay").style.display = "flex";
+  }
+
+  document.getElementById("tmBackBtn").addEventListener("click", function(){ showPage("favoritesPage"); });
+  document.getElementById("tmNewGameBtn").addEventListener("click", openTileMatch);
+  document.getElementById("tmPlayAgainBtn").addEventListener("click", openTileMatch);
 
   loadStore();
   ensureFavorites();
