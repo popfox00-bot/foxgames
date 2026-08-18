@@ -351,7 +351,7 @@
     aspect-ratio:1; border-radius:8px;
     background:#FFF3D6;
     display:flex; align-items:center; justify-content:center;
-    font-size:clamp(15px,4.2vw,22px); cursor:pointer; user-select:none; -webkit-user-select:none;
+    font-size:clamp(18px,5.6vw,30px); cursor:pointer; user-select:none; -webkit-user-select:none;
     transition:box-shadow .15s ease;
   }
   .tm-tile.hidden{ box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
@@ -3161,8 +3161,8 @@
   var tm = {
     difficulty: "easy", pairs: 10,
     board: [], firstIndex: null, secondIndex: null, locked: false,
-    matchesFound: 0, points: 0, streak: 0,
-    startTimestamp: 0, lastMatchTimestamp: 0, elapsedMs: 0,
+    matchesFound: 0, points: 0, streak: 0, attemptCount: 0,
+    startTimestamp: 0, elapsedMs: 0,
     timerInterval: null, gameOver: false
   };
   var tmMsgTimeout = null;
@@ -3223,9 +3223,9 @@
     tm.matchesFound = 0;
     tm.points = 0;
     tm.streak = 0;
+    tm.attemptCount = 0;
     tm.gameOver = false;
     tm.startTimestamp = Date.now();
-    tm.lastMatchTimestamp = tm.startTimestamp;
     tm.elapsedMs = 0;
 
     document.getElementById("tmGrid").style.gridTemplateColumns = "repeat(" + cfg.cols + ",1fr)";
@@ -3291,15 +3291,16 @@
 
     tm.secondIndex = i;
     tm.locked = true;
+    tm.attemptCount++; // this flip-pair counts as one attempt, whether it's a hit or a miss
     var isMatch = tm.board[tm.firstIndex].emoji === tm.board[tm.secondIndex].emoji;
-    var clickTimestamp = Date.now(); // the moment the match was actually found, before the pause
+    var attemptsForThisMatch = tm.attemptCount;
 
     var fIdx = tm.firstIndex, sIdx = tm.secondIndex;
     setTimeout(function(){
       if (isMatch){
         tm.board[fIdx].state = "matched";
         tm.board[sIdx].state = "matched";
-        resolveTmMatch(clickTimestamp);
+        resolveTmMatch(attemptsForThisMatch);
       } else {
         tm.board[fIdx].state = "hidden";
         tm.board[sIdx].state = "hidden";
@@ -3318,20 +3319,13 @@
     }, TM_REVEAL_PAUSE_MS);
   }
 
-  // Scored on how long it took to FIND the match (from the last successful match to the
-  // moment the second tile was clicked) — the evaluation pause itself isn't held against you.
-  function resolveTmMatch(matchTimestamp){
-    var elapsed = matchTimestamp - tm.lastMatchTimestamp;
-    var pts;
-    if (elapsed <= 10000) pts = 5;
-    else if (elapsed <= 15000) pts = 4;
-    else if (elapsed <= 20000) pts = 3;
-    else if (elapsed <= 30000) pts = 2;
-    else if (elapsed <= 60000) pts = 1;
-    else pts = 0;
+  // Scored on how many attempts (flip-pairs) it took since the last successful match to
+  // find this one: 1 attempt = 5pts, 2 = 4pts, 3 = 3pts, 4 = 2pts, 5+ always floors at 1pt.
+  function resolveTmMatch(attempts){
+    var pts = Math.max(1, 6 - attempts);
 
     tm.streak++;
-    var msg = "+" + pts + " point" + (pts === 1 ? "" : "s");
+    var msg = "Match Found in " + attempts + " Attempt" + (attempts === 1 ? "" : "s") + " (+" + pts + " point" + (pts === 1 ? "" : "s") + ")";
     // A 2+ streak triggers the bonus every match from the 2nd consecutive one onward —
     // so a 3-in-a-row streak fires it twice (at match 2 and again at match 3), matching
     // "three in a row counts as two consecutive two-in-a-rows."
@@ -3340,7 +3334,7 @@
       msg += " (+" + TM_STREAK_BONUS + " *Match Streak Bonus*)";
     }
     tm.points += pts;
-    tm.lastMatchTimestamp = matchTimestamp;
+    tm.attemptCount = 0; // reset the hunt for the next pair
     showTmMessage(msg);
     updateTmScoreDisplay();
   }
