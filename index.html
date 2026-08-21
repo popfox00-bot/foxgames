@@ -206,6 +206,23 @@
   .sol-action-row{ display:flex; gap:10px; margin-top:14px; }
   .sol-action-row .text-btn{ flex:1; }
 
+  /* ---- Blackjack (same card look as Solitaire, laid out as flat hands not cascades) ---- */
+  .bj-hand-label{ font-size:12px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px; text-align:center; }
+  .bj-hand-label .bj-value{ color:var(--accent); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight:700; margin-left:4px; }
+  .bj-hand{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:flex-start; min-height:92px; }
+  .bj-card{
+    width:58px; aspect-ratio:0.7; border-radius:7px;
+    background:#F7F5F0; box-shadow:0 2px 4px rgba(0,0,0,0.28), inset 0 0 0 1px rgba(0,0,0,0.10);
+    display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start;
+    padding:6% 0 0 9%; box-sizing:border-box;
+    font-weight:800; font-size:14px; user-select:none; -webkit-user-select:none;
+    line-height:1.05;
+  }
+  .bj-card .bj-suit{ font-size:1.15em; margin-top:1px; }
+  .bj-card.red{ color:#C0453A; }
+  .bj-card.black{ color:#1A1A1C; }
+  .bj-card.facedown{ background:linear-gradient(160deg, var(--accent), #7A3A12); box-shadow:0 2px 4px rgba(0,0,0,0.28), inset 0 0 0 1px rgba(255,255,255,0.12); }
+
   /* ---- Spelling Bee ---- */
   .bee-tier-wrap{ margin-bottom:18px; }
   .bee-tier-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; }
@@ -345,7 +362,7 @@
   .tm-stat-num{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:24px; font-weight:700; color:var(--accent); }
   .tm-stat-label{ font-size:10.5px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-top:2px; }
   .tm-message{ text-align:center; font-size:12.5px; font-weight:700; color:var(--good); min-height:18px; margin:10px 0; }
-  .tm-wrap{ position:relative; background:#3D6C99; border-radius:16px; padding:12px; }
+  .tm-wrap{ position:relative; background:#3D6C99; border-radius:16px; padding:12px; min-height:420px; }
   .tm-grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:5px; max-width:380px; margin:0 auto; }
   .tm-tile{
     aspect-ratio:1; border-radius:8px;
@@ -461,6 +478,31 @@
       <button class="text-btn" id="solHintBtn" style="margin-top:0;">Hint</button>
       <button class="text-btn" id="solNewGameBtn" style="margin-top:0;">New Game</button>
     </div>
+  </div>
+
+  <div id="blackjackPage" class="page">
+    <div class="top-bar">
+      <button class="icon-btn" id="bjBackBtn" aria-label="Back">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+      </button>
+      <div>
+        <p class="eyebrow">Vs. Dealer</p>
+        <h1 style="margin-bottom:0;">Blackjack</h1>
+      </div>
+    </div>
+    <p class="chess-status" id="bjMessage">&nbsp;</p>
+
+    <div class="bj-hand-label">Dealer <span class="bj-value" id="bjDealerValue"></span></div>
+    <div class="bj-hand" id="bjDealerHand"></div>
+
+    <div class="bj-hand-label" style="margin-top:20px;">You <span class="bj-value" id="bjPlayerValue"></span></div>
+    <div class="bj-hand" id="bjPlayerHand"></div>
+
+    <div class="sol-action-row" style="margin-top:22px;">
+      <button class="text-btn" id="bjHitBtn" style="margin-top:0;">Hit</button>
+      <button class="text-btn" id="bjStandBtn" style="margin-top:0;">Stand</button>
+    </div>
+    <button class="text-btn" id="bjNewHandBtn" style="display:none;">Deal Again</button>
   </div>
 
   <div id="tileMatchPage" class="page">
@@ -608,7 +650,7 @@
   "use strict";
 
   var STORAGE_KEY = "foxGames";
-  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, longestTimes: {}, checkersRecord: { wins:0, losses:0, totalMovesInWins:0, movesTrackedWins:0 }, solitaireRecord: { wins:0, played:0, bestMoves:null }, tileMatchRecord: { easy:{ played:0, bestTimeMs:null, bestPoints:0 }, medium:{ played:0, bestTimeMs:null, bestPoints:0 }, hard:{ played:0, bestTimeMs:null, bestPoints:0 } } };
+  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, longestTimes: {}, checkersRecord: { wins:0, losses:0, totalMovesInWins:0, movesTrackedWins:0 }, solitaireRecord: { wins:0, played:0, bestMoves:null }, tileMatchRecord: { easy:{ played:0, bestTimeMs:null, bestPoints:0 }, medium:{ played:0, bestTimeMs:null, bestPoints:0 }, hard:{ played:0, bestTimeMs:null, bestPoints:0 } }, blackjackRecord: { wins:0, losses:0, pushes:0, blackjacks:0 } };
 
   function loadStore(){
     try{
@@ -638,6 +680,11 @@
           if (store.tileMatchRecord[k].bestTimeMs === undefined) store.tileMatchRecord[k].bestTimeMs = null;
           if (store.tileMatchRecord[k].bestPoints === undefined) store.tileMatchRecord[k].bestPoints = 0;
         });
+        if (!store.blackjackRecord) store.blackjackRecord = { wins:0, losses:0, pushes:0, blackjacks:0 };
+        if (store.blackjackRecord.wins === undefined) store.blackjackRecord.wins = 0;
+        if (store.blackjackRecord.losses === undefined) store.blackjackRecord.losses = 0;
+        if (store.blackjackRecord.pushes === undefined) store.blackjackRecord.pushes = 0;
+        if (store.blackjackRecord.blackjacks === undefined) store.blackjackRecord.blackjacks = 0;
       }
     }catch(e){}
   }
@@ -689,6 +736,9 @@
     },
     { id:"tilematch", name:"Tile Match", page:"tileMatchPage", defaultFavorite:false, icon:
       '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.2"/><rect x="14" y="14" width="7" height="7" rx="1.2" fill="white"/></svg>'
+    },
+    { id:"blackjack", name:"Blackjack", page:"blackjackPage", defaultFavorite:false, icon:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="10" height="15" rx="1.6"/><rect x="10" y="6" width="10" height="15" rx="1.6" fill="white" stroke="none"/><text x="14" y="16" font-size="7" fill="black" font-weight="bold" text-anchor="middle" font-family="sans-serif">A</text></svg>'
     }
   ];
   function ensureFavorites(){
@@ -739,7 +789,7 @@
   }
 
   // ================= NAVIGATION =================
-  var pages = ["favoritesPage","newGamesPage","statsPage","settingsPage","chessPage","checkersPage","roadPage","spellingbeePage","dailyFivePage","solitairePage","tileMatchPage"];
+  var pages = ["favoritesPage","newGamesPage","statsPage","settingsPage","chessPage","checkersPage","roadPage","spellingbeePage","dailyFivePage","solitairePage","tileMatchPage","blackjackPage"];
   function showPage(id){
     pages.forEach(function(p){ document.getElementById(p).classList.toggle("active", p===id); });
     ["tabFavorites","tabNewGames","tabStats","tabSettings"].forEach(function(t){
@@ -765,6 +815,7 @@
     else if (g.id === "dailyfive") openDailyFive();
     else if (g.id === "solitaire") openSolitaire();
     else if (g.id === "tilematch") openTileMatch();
+    else if (g.id === "blackjack") openBlackjack();
   }
 
   // ================= FAVORITES / NEW GAMES (shared heart-tile rendering) =================
@@ -937,6 +988,14 @@
     var solBest = store.solitaireRecord.bestMoves;
     out += statSectionHtml("solitaire", "Solitaire",
       statCardHtml(solWins, "Wins") + statCardHtml(solWinPct + "%", "Win Rate") + statCardHtml(solBest !== null ? solBest : "\u2014", "Fewest Moves to Win"),
+      null);
+
+    // Blackjack: wins/losses/pushes, plus a nod to how many naturals you've hit
+    var bjWins = store.blackjackRecord.wins, bjLosses = store.blackjackRecord.losses, bjPushes = store.blackjackRecord.pushes;
+    var bjTotal = bjWins + bjLosses + bjPushes;
+    var bjWinPct = bjTotal > 0 ? Math.round((bjWins/bjTotal)*100) : 0;
+    out += statSectionHtml("blackjack", "Blackjack",
+      statCardHtml(bjWins + "\u2013" + bjLosses + "\u2013" + bjPushes, "W/L/Push") + statCardHtml(bjWinPct + "%", "Win Rate") + statCardHtml(store.blackjackRecord.blackjacks, "Blackjacks"),
       null);
 
     document.getElementById("statsBody").innerHTML = out;
@@ -3374,6 +3433,157 @@
 
   document.getElementById("tmBackBtn").addEventListener("click", function(){ showPage("favoritesPage"); });
   document.getElementById("tmNewGameBtn").addEventListener("click", showTmDifficultyPicker);
+
+  // ================= BLACKJACK ENGINE =================
+  // Reuses Solitaire's deck/suit/rank helpers (SUITS, solBuildDeck, solShuffle,
+  // solIsRed, solRankLabel, solSuitSymbol) so the cards read identically.
+  var bj = { deck: [], playerHand: [], dealerHand: [], state: "idle" };
+  var bjDealerTimeout = null;
+
+  function bjHandValue(hand){
+    var total = 0, aces = 0;
+    hand.forEach(function(c){
+      var v = c.rank === 1 ? 11 : c.rank >= 11 ? 10 : c.rank;
+      if (c.rank === 1) aces++;
+      total += v;
+    });
+    while (total > 21 && aces > 0){ total -= 10; aces--; }
+    return total;
+  }
+  function bjVisibleValue(hand){
+    return bjHandValue(hand.filter(function(c){ return c.faceUp; }));
+  }
+
+  function openBlackjack(){
+    bjDealNewHand();
+  }
+
+  function bjDealCard(hand, faceUp){
+    if (bj.deck.length === 0) bj.deck = solShuffle(solBuildDeck());
+    var card = bj.deck.pop();
+    card.faceUp = faceUp;
+    hand.push(card);
+  }
+
+  function bjDealNewHand(){
+    if (bjDealerTimeout){ clearTimeout(bjDealerTimeout); bjDealerTimeout = null; }
+    if (bj.deck.length < 15) bj.deck = solShuffle(solBuildDeck()); // reshuffle before running low
+    bj.playerHand = [];
+    bj.dealerHand = [];
+    bj.state = "playerTurn";
+    bjDealCard(bj.playerHand, true);
+    bjDealCard(bj.dealerHand, true);
+    bjDealCard(bj.playerHand, true);
+    bjDealCard(bj.dealerHand, false);
+
+    showBjMessage("Your move — hit or stand.");
+    renderBjTable();
+
+    var playerBJ = bjHandValue(bj.playerHand) === 21;
+    var dealerBJ = bjHandValue(bj.dealerHand) === 21;
+    if (playerBJ || dealerBJ){
+      bj.dealerHand.forEach(function(c){ c.faceUp = true; });
+      bj.state = "roundOver";
+      var result = playerBJ && dealerBJ ? "push" : playerBJ ? "blackjack" : "lose";
+      bjFinishRound(result);
+    }
+  }
+
+  function bjHit(){
+    if (bj.state !== "playerTurn") return;
+    bjDealCard(bj.playerHand, true);
+    renderBjTable();
+    if (bjHandValue(bj.playerHand) > 21){
+      bj.dealerHand.forEach(function(c){ c.faceUp = true; });
+      bj.state = "roundOver";
+      bjFinishRound("bust");
+    } else {
+      showBjMessage("Your move — hit or stand.");
+    }
+  }
+
+  function bjStand(){
+    if (bj.state !== "playerTurn") return;
+    bj.state = "dealerTurn";
+    bj.dealerHand.forEach(function(c){ c.faceUp = true; });
+    renderBjTable();
+    showBjMessage("Dealer is playing…");
+    bjDealerTimeout = setTimeout(bjDealerPlay, 650);
+  }
+
+  function bjDealerPlay(){
+    var val = bjHandValue(bj.dealerHand);
+    if (val < 17){
+      bjDealCard(bj.dealerHand, true);
+      renderBjTable();
+      bjDealerTimeout = setTimeout(bjDealerPlay, 650);
+      return;
+    }
+    bj.state = "roundOver";
+    var playerVal = bjHandValue(bj.playerHand);
+    var result;
+    if (val > 21) result = "dealerbust";
+    else if (val > playerVal) result = "lose";
+    else if (val < playerVal) result = "win";
+    else result = "push";
+    bjFinishRound(result);
+  }
+
+  function bjFinishRound(result){
+    var msg;
+    switch (result){
+      case "blackjack": msg = "Blackjack! You win."; store.blackjackRecord.wins++; store.blackjackRecord.blackjacks++; break;
+      case "win": msg = "You win!"; store.blackjackRecord.wins++; break;
+      case "dealerbust": msg = "Dealer busts — you win!"; store.blackjackRecord.wins++; break;
+      case "lose": msg = "Dealer wins."; store.blackjackRecord.losses++; break;
+      case "bust": msg = "Bust! You lose."; store.blackjackRecord.losses++; break;
+      case "push": msg = "Push — it's a tie."; store.blackjackRecord.pushes++; break;
+    }
+    saveStore();
+    showBjMessage(msg);
+    renderBjTable();
+  }
+
+  function bjCardEl(card){
+    var el = document.createElement("div");
+    if (card.faceUp){
+      el.className = "bj-card " + (solIsRed(card) ? "red" : "black");
+      el.innerHTML = "<div>" + solRankLabel(card.rank) + "</div><div class=\"bj-suit\">" + solSuitSymbol(card.suit) + "</div>";
+    } else {
+      el.className = "bj-card facedown";
+    }
+    return el;
+  }
+
+  function renderBjTable(){
+    var dealerEl = document.getElementById("bjDealerHand");
+    dealerEl.innerHTML = "";
+    bj.dealerHand.forEach(function(c){ dealerEl.appendChild(bjCardEl(c)); });
+    document.getElementById("bjDealerValue").textContent =
+      bj.state === "playerTurn" ? bjVisibleValue(bj.dealerHand) : bjHandValue(bj.dealerHand);
+
+    var playerEl = document.getElementById("bjPlayerHand");
+    playerEl.innerHTML = "";
+    bj.playerHand.forEach(function(c){ playerEl.appendChild(bjCardEl(c)); });
+    document.getElementById("bjPlayerValue").textContent = bjHandValue(bj.playerHand);
+
+    var isPlayerTurn = bj.state === "playerTurn";
+    document.getElementById("bjHitBtn").style.display = isPlayerTurn ? "" : "none";
+    document.getElementById("bjStandBtn").style.display = isPlayerTurn ? "" : "none";
+    document.getElementById("bjNewHandBtn").style.display = bj.state === "roundOver" ? "" : "none";
+  }
+
+  function showBjMessage(text){
+    document.getElementById("bjMessage").textContent = text || "\u00A0";
+  }
+
+  document.getElementById("bjBackBtn").addEventListener("click", function(){
+    if (bjDealerTimeout){ clearTimeout(bjDealerTimeout); bjDealerTimeout = null; }
+    showPage("favoritesPage");
+  });
+  document.getElementById("bjHitBtn").addEventListener("click", bjHit);
+  document.getElementById("bjStandBtn").addEventListener("click", bjStand);
+  document.getElementById("bjNewHandBtn").addEventListener("click", bjDealNewHand);
 
   loadStore();
   ensureFavorites();
