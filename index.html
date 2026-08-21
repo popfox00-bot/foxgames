@@ -222,6 +222,23 @@
   .bj-card.red{ color:#C0453A; }
   .bj-card.black{ color:#1A1A1C; }
   .bj-card.facedown{ background:linear-gradient(160deg, var(--accent), #7A3A12); box-shadow:0 2px 4px rgba(0,0,0,0.28), inset 0 0 0 1px rgba(255,255,255,0.12); }
+  .bj-betting{ text-align:center; margin-top:14px; }
+  .bj-bet-display{ font-size:14px; font-weight:700; color:var(--ink); margin-bottom:12px; }
+  .bj-bet-display #bjCurrentBet{ color:var(--accent); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .bj-chip-row{ display:flex; gap:16px; justify-content:center; margin-bottom:14px; }
+  .bj-chip{
+    width:62px; height:62px; border-radius:50%; border:3px dashed rgba(255,255,255,0.55);
+    font-weight:800; font-size:14px; cursor:pointer; color:#fff;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .bj-chip:active{ transform:scale(0.94); }
+  .bj-chip:disabled{ opacity:0.32; cursor:default; }
+  #bjChip1{ background:#3E6B8A; }
+  #bjChip5{ background:#B0473F; }
+  #bjChip10{ background:#1F5C33; }
+  .bj-balance-bar{ margin-top:22px; text-align:center; background:var(--panel); border-radius:14px; padding:16px; box-shadow: inset 0 0 0 1px var(--rule); }
+  .bj-balance-label{ font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; font-weight:700; }
+  .bj-balance-num{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:28px; font-weight:800; color:var(--accent); margin-top:2px; }
 
   /* ---- Spelling Bee ---- */
   .bee-tier-wrap{ margin-bottom:18px; }
@@ -508,11 +525,31 @@
     <div class="bj-hand-label" style="margin-top:20px;">You <span class="bj-value" id="bjPlayerValue"></span></div>
     <div class="bj-hand" id="bjPlayerHand"></div>
 
-    <div class="sol-action-row" style="margin-top:22px;">
+    <div class="sol-action-row" style="margin-top:22px;" id="bjPlayRow">
       <button class="text-btn" id="bjHitBtn" style="margin-top:0;">Hit</button>
       <button class="text-btn" id="bjStandBtn" style="margin-top:0;">Stand</button>
     </div>
-    <button class="text-btn" id="bjNewHandBtn" style="display:none;">Deal Again</button>
+
+    <div class="bj-betting" id="bjBetting" style="display:none;">
+      <div class="bj-bet-display">Current Bet: <span id="bjCurrentBet">$0</span></div>
+      <div class="bj-chip-row">
+        <button class="bj-chip" id="bjChip1" data-value="1">$1</button>
+        <button class="bj-chip" id="bjChip5" data-value="5">$5</button>
+        <button class="bj-chip" id="bjChip10" data-value="10">$10</button>
+      </div>
+      <div class="sol-action-row" style="margin-top:4px;">
+        <button class="text-btn" id="bjClearBetBtn" style="margin-top:0;">Clear</button>
+        <button class="text-btn" id="bjDealBtn" style="margin-top:0;">Deal</button>
+      </div>
+      <button class="text-btn" id="bjResetBalanceBtn" style="display:none;">Reset Bankroll to $100</button>
+    </div>
+
+    <button class="text-btn" id="bjNewHandBtn" style="display:none;">Next Hand</button>
+
+    <div class="bj-balance-bar">
+      <div class="bj-balance-label">Total</div>
+      <div class="bj-balance-num" id="bjBalance">$100</div>
+    </div>
   </div>
 
   <div id="tileMatchPage" class="page">
@@ -554,7 +591,7 @@
       </div>
     </div>
 
-    <button class="text-btn" id="tmNewGameBtn">Change Difficulty</button>
+    <button class="text-btn" id="tmNewGameBtn">Main Menu</button>
   </div>
 
   <div id="roadPage" class="page">
@@ -665,7 +702,7 @@
   "use strict";
 
   var STORAGE_KEY = "foxGames";
-  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, longestTimes: {}, checkersRecord: { wins:0, losses:0, totalMovesInWins:0, movesTrackedWins:0 }, solitaireRecord: { wins:0, played:0, bestMoves:null }, tileMatchRecord: { easy:{ played:0, bestTimeMs:null, bestPoints:0 }, medium:{ played:0, bestTimeMs:null, bestPoints:0 }, hard:{ played:0, bestTimeMs:null, bestPoints:0 } }, blackjackRecord: { wins:0, losses:0, pushes:0, blackjacks:0 } };
+  var store = { dailyLog: {}, settings: { theme:"dark" }, favorites: null, highScores: {}, longestTimes: {}, checkersRecord: { wins:0, losses:0, totalMovesInWins:0, movesTrackedWins:0 }, solitaireRecord: { wins:0, played:0, bestMoves:null }, tileMatchRecord: { easy:{ played:0, bestTimeMs:null, bestPoints:0 }, medium:{ played:0, bestTimeMs:null, bestPoints:0 }, hard:{ played:0, bestTimeMs:null, bestPoints:0 } }, blackjackRecord: { wins:0, losses:0, pushes:0, blackjacks:0 }, blackjackBalance: 100 };
 
   function loadStore(){
     try{
@@ -700,6 +737,7 @@
         if (store.blackjackRecord.losses === undefined) store.blackjackRecord.losses = 0;
         if (store.blackjackRecord.pushes === undefined) store.blackjackRecord.pushes = 0;
         if (store.blackjackRecord.blackjacks === undefined) store.blackjackRecord.blackjacks = 0;
+        if (store.blackjackBalance === undefined || store.blackjackBalance === null) store.blackjackBalance = 100;
       }
     }catch(e){}
   }
@@ -3366,39 +3404,45 @@
     if (i === tm.firstIndex) return;
 
     tm.secondIndex = i;
-    tm.locked = true;
     tm.attemptCount++; // this flip-pair counts as one attempt, whether it's a hit or a miss
     var isMatch = tm.board[tm.firstIndex].emoji === tm.board[tm.secondIndex].emoji;
     var attemptsForThisMatch = tm.attemptCount;
-
     var fIdx = tm.firstIndex, sIdx = tm.secondIndex;
-    setTimeout(function(){
-      if (isMatch){
-        tm.board[fIdx].state = "matched";
-        tm.board[sIdx].state = "matched";
-        resolveTmMatch(attemptsForThisMatch);
-      } else {
+
+    if (isMatch){
+      // Resolve immediately — no lock, no pause. The player can go straight into their next guess.
+      tm.board[fIdx].state = "matched";
+      tm.board[sIdx].state = "matched";
+      renderTmTile(fIdx);
+      renderTmTile(sIdx);
+      resolveTmMatch(attemptsForThisMatch);
+
+      var gridEl = document.getElementById("tmGrid");
+      [fIdx, sIdx].forEach(function(idx){
+        var el = gridEl.children[idx];
+        el.classList.add("flash");
+        setTimeout(function(){ el.classList.remove("flash"); }, 700);
+      });
+
+      tm.firstIndex = null;
+      tm.secondIndex = null;
+
+      tm.matchesFound++;
+      if (tm.matchesFound === tm.pairs) finishTileMatch();
+    } else {
+      // Only a miss needs the pause, so the player has time to see what was revealed.
+      tm.locked = true;
+      setTimeout(function(){
         tm.board[fIdx].state = "hidden";
         tm.board[sIdx].state = "hidden";
         tm.streak = 0;
-      }
-      renderTmTile(fIdx);
-      renderTmTile(sIdx);
-      tm.firstIndex = null;
-      tm.secondIndex = null;
-      tm.locked = false;
-
-      if (isMatch){
-        var gridEl = document.getElementById("tmGrid");
-        [fIdx, sIdx].forEach(function(idx){
-          var el = gridEl.children[idx];
-          el.classList.add("flash");
-          setTimeout(function(){ el.classList.remove("flash"); }, 700);
-        });
-        tm.matchesFound++;
-        if (tm.matchesFound === tm.pairs) finishTileMatch();
-      }
-    }, TM_REVEAL_PAUSE_MS);
+        renderTmTile(fIdx);
+        renderTmTile(sIdx);
+        tm.firstIndex = null;
+        tm.secondIndex = null;
+        tm.locked = false;
+      }, TM_REVEAL_PAUSE_MS);
+    }
   }
 
   // Scored on how many attempts (flip-pairs) it took since the last successful match to
@@ -3444,8 +3488,8 @@
     again.addEventListener("click", function(){ startTileMatchGame(tm.difficulty); });
     var change = document.createElement("button");
     change.className = "road-choice-btn secondary";
-    change.textContent = "Change Difficulty";
-    change.addEventListener("click", showTmDifficultyPicker);
+    change.textContent = "Return to Main Menu";
+    change.addEventListener("click", function(){ showPage("favoritesPage"); });
     row.appendChild(again);
     row.appendChild(change);
     var btnsEl = document.getElementById("tmOverlayButtons");
@@ -3455,12 +3499,12 @@
   }
 
   document.getElementById("tmBackBtn").addEventListener("click", function(){ showPage("favoritesPage"); });
-  document.getElementById("tmNewGameBtn").addEventListener("click", showTmDifficultyPicker);
+  document.getElementById("tmNewGameBtn").addEventListener("click", function(){ showPage("favoritesPage"); });
 
   // ================= BLACKJACK ENGINE =================
   // Reuses Solitaire's deck/suit/rank helpers (SUITS, solBuildDeck, solShuffle,
   // solIsRed, solRankLabel, solSuitSymbol) so the cards read identically.
-  var bj = { deck: [], playerHand: [], dealerHand: [], state: "idle" };
+  var bj = { deck: [], playerHand: [], dealerHand: [], state: "betting", bet: 0, pendingBet: 0 };
   var bjDealerTimeout = null;
 
   function bjHandValue(hand){
@@ -3476,9 +3520,43 @@
   function bjVisibleValue(hand){
     return bjHandValue(hand.filter(function(c){ return c.faceUp; }));
   }
+  function formatMoney(amount){
+    amount = Math.round(amount * 100) / 100; // guard against float artifacts like 12.499999999
+    var isWhole = Math.abs(amount - Math.round(amount)) < 0.001;
+    return "$" + (isWhole ? Math.round(amount) : amount.toFixed(2));
+  }
 
   function openBlackjack(){
-    bjDealNewHand();
+    if (store.blackjackBalance === undefined || store.blackjackBalance === null) store.blackjackBalance = 100;
+    bjGoToBetting();
+  }
+
+  function bjGoToBetting(){
+    if (bjDealerTimeout){ clearTimeout(bjDealerTimeout); bjDealerTimeout = null; }
+    bj.state = "betting";
+    bj.pendingBet = 0;
+    bj.playerHand = [];
+    bj.dealerHand = [];
+    showBjMessage(store.blackjackBalance > 0 ? "Place your bet." : "You're out of chips!");
+    renderBjTable();
+    renderBjUIState();
+  }
+
+  function bjAddChip(value){
+    if (bj.state !== "betting") return;
+    if (bj.pendingBet + value > store.blackjackBalance) return;
+    bj.pendingBet += value;
+    renderBjUIState();
+  }
+  function bjClearBet(){
+    if (bj.state !== "betting") return;
+    bj.pendingBet = 0;
+    renderBjUIState();
+  }
+  function bjResetBalance(){
+    store.blackjackBalance = 100;
+    saveStore();
+    bjGoToBetting();
   }
 
   function bjDealCard(hand, faceUp){
@@ -3488,8 +3566,12 @@
     hand.push(card);
   }
 
-  function bjDealNewHand(){
-    if (bjDealerTimeout){ clearTimeout(bjDealerTimeout); bjDealerTimeout = null; }
+  function bjDeal(){
+    if (bj.state !== "betting" || bj.pendingBet <= 0) return;
+    bj.bet = bj.pendingBet;
+    store.blackjackBalance -= bj.bet;
+    saveStore();
+
     if (bj.deck.length < 15) bj.deck = solShuffle(solBuildDeck()); // reshuffle before running low
     bj.playerHand = [];
     bj.dealerHand = [];
@@ -3501,6 +3583,7 @@
 
     showBjMessage("Your move — hit or stand.");
     renderBjTable();
+    renderBjUIState();
 
     var playerBJ = bjHandValue(bj.playerHand) === 21;
     var dealerBJ = bjHandValue(bj.dealerHand) === 21;
@@ -3530,6 +3613,7 @@
     bj.state = "dealerTurn";
     bj.dealerHand.forEach(function(c){ c.faceUp = true; });
     renderBjTable();
+    renderBjUIState();
     showBjMessage("Dealer is playing…");
     bjDealerTimeout = setTimeout(bjDealerPlay, 650);
   }
@@ -3552,19 +3636,45 @@
     bjFinishRound(result);
   }
 
+  // Payouts: win/dealer-bust return the wager plus an equal win (1:1). A natural blackjack
+  // on the first two cards pays 3:2 (wager back plus 1.5x). A push just returns the wager.
+  // A loss/bust keeps the wager, which was already deducted at deal time.
   function bjFinishRound(result){
     var msg;
     switch (result){
-      case "blackjack": msg = "Blackjack! You win."; store.blackjackRecord.wins++; store.blackjackRecord.blackjacks++; break;
-      case "win": msg = "You win!"; store.blackjackRecord.wins++; break;
-      case "dealerbust": msg = "Dealer busts — you win!"; store.blackjackRecord.wins++; break;
-      case "lose": msg = "Dealer wins."; store.blackjackRecord.losses++; break;
-      case "bust": msg = "Bust! You lose."; store.blackjackRecord.losses++; break;
-      case "push": msg = "Push — it's a tie."; store.blackjackRecord.pushes++; break;
+      case "blackjack":
+        msg = "Blackjack! You win 3:2.";
+        store.blackjackBalance += bj.bet * 2.5;
+        store.blackjackRecord.wins++; store.blackjackRecord.blackjacks++;
+        break;
+      case "win":
+        msg = "You win!";
+        store.blackjackBalance += bj.bet * 2;
+        store.blackjackRecord.wins++;
+        break;
+      case "dealerbust":
+        msg = "Dealer busts — you win!";
+        store.blackjackBalance += bj.bet * 2;
+        store.blackjackRecord.wins++;
+        break;
+      case "lose":
+        msg = "Dealer wins.";
+        store.blackjackRecord.losses++;
+        break;
+      case "bust":
+        msg = "Bust! You lose.";
+        store.blackjackRecord.losses++;
+        break;
+      case "push":
+        msg = "Push — it's a tie.";
+        store.blackjackBalance += bj.bet;
+        store.blackjackRecord.pushes++;
+        break;
     }
     saveStore();
     showBjMessage(msg);
     renderBjTable();
+    renderBjUIState();
   }
 
   function bjCardEl(card){
@@ -3582,18 +3692,34 @@
     var dealerEl = document.getElementById("bjDealerHand");
     dealerEl.innerHTML = "";
     bj.dealerHand.forEach(function(c){ dealerEl.appendChild(bjCardEl(c)); });
-    document.getElementById("bjDealerValue").textContent =
-      bj.state === "playerTurn" ? bjVisibleValue(bj.dealerHand) : bjHandValue(bj.dealerHand);
+    document.getElementById("bjDealerValue").textContent = bj.dealerHand.length
+      ? (bj.state === "playerTurn" ? bjVisibleValue(bj.dealerHand) : bjHandValue(bj.dealerHand))
+      : "";
 
     var playerEl = document.getElementById("bjPlayerHand");
     playerEl.innerHTML = "";
     bj.playerHand.forEach(function(c){ playerEl.appendChild(bjCardEl(c)); });
-    document.getElementById("bjPlayerValue").textContent = bjHandValue(bj.playerHand);
+    document.getElementById("bjPlayerValue").textContent = bj.playerHand.length ? bjHandValue(bj.playerHand) : "";
 
-    var isPlayerTurn = bj.state === "playerTurn";
-    document.getElementById("bjHitBtn").style.display = isPlayerTurn ? "" : "none";
-    document.getElementById("bjStandBtn").style.display = isPlayerTurn ? "" : "none";
-    document.getElementById("bjNewHandBtn").style.display = bj.state === "roundOver" ? "" : "none";
+    document.getElementById("bjBalance").textContent = formatMoney(store.blackjackBalance);
+  }
+
+  // Handles all button/section visibility for the current state (betting / playing / round over).
+  function renderBjUIState(){
+    var betting = bj.state === "betting";
+    var playing = bj.state === "playerTurn";
+    var over = bj.state === "roundOver";
+
+    document.getElementById("bjBetting").style.display = betting ? "block" : "none";
+    document.getElementById("bjPlayRow").style.display = playing ? "flex" : "none";
+    document.getElementById("bjNewHandBtn").style.display = over ? "" : "none";
+
+    document.getElementById("bjCurrentBet").textContent = formatMoney(bj.pendingBet);
+    document.getElementById("bjDealBtn").disabled = bj.pendingBet <= 0;
+    [1,5,10].forEach(function(v){
+      document.getElementById("bjChip" + v).disabled = (bj.pendingBet + v) > store.blackjackBalance;
+    });
+    document.getElementById("bjResetBalanceBtn").style.display = (betting && store.blackjackBalance <= 0) ? "" : "none";
   }
 
   function showBjMessage(text){
@@ -3606,7 +3732,13 @@
   });
   document.getElementById("bjHitBtn").addEventListener("click", bjHit);
   document.getElementById("bjStandBtn").addEventListener("click", bjStand);
-  document.getElementById("bjNewHandBtn").addEventListener("click", bjDealNewHand);
+  document.getElementById("bjNewHandBtn").addEventListener("click", bjGoToBetting);
+  document.getElementById("bjChip1").addEventListener("click", function(){ bjAddChip(1); });
+  document.getElementById("bjChip5").addEventListener("click", function(){ bjAddChip(5); });
+  document.getElementById("bjChip10").addEventListener("click", function(){ bjAddChip(10); });
+  document.getElementById("bjClearBetBtn").addEventListener("click", bjClearBet);
+  document.getElementById("bjDealBtn").addEventListener("click", bjDeal);
+  document.getElementById("bjResetBalanceBtn").addEventListener("click", bjResetBalance);
 
   loadStore();
   ensureFavorites();
