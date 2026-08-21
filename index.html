@@ -352,7 +352,7 @@
   .road-overlay-card{ text-align:center; }
   .road-overlay-title{ color:#fff; font-size:20px; font-weight:800; margin-bottom:8px; }
   .road-overlay-sub{ color:rgba(255,255,255,0.82); font-size:12.5px; line-height:1.6; margin-bottom:18px; }
-  .road-diff-row{ display:flex; flex-direction:column; gap:8px; width:220px; }
+  .road-diff-row{ display:flex; flex-direction:column; gap:8px; width:220px; margin:0 auto; }
   .road-diff-btn{ border:none; background:rgba(255,255,255,0.12); color:#fff; font-weight:700; font-size:13.5px; padding:12px; border-radius:11px; cursor:pointer; }
   .road-diff-btn.selected{ background:var(--accent); }
 
@@ -363,17 +363,27 @@
   .tm-stat-label{ font-size:10.5px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-top:2px; }
   .tm-message{ text-align:center; font-size:12.5px; font-weight:700; color:var(--good); min-height:18px; margin:10px 0; }
   .tm-wrap{ position:relative; background:#3D6C99; border-radius:16px; padding:12px; min-height:420px; }
+  .tm-picker{ text-align:center; padding:36px 12px; }
+  .tm-picker .road-overlay-title{ color:#fff; }
+  .tm-picker .road-overlay-sub{ color:rgba(255,255,255,0.82); }
   .tm-grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:5px; max-width:380px; margin:0 auto; }
   .tm-tile{
-    aspect-ratio:1; border-radius:8px;
+    position:relative; aspect-ratio:1; border-radius:8px; overflow:hidden;
     background:#FFF3D6;
     display:flex; align-items:center; justify-content:center;
-    font-size:clamp(18px,5.6vw,30px); cursor:pointer; user-select:none; -webkit-user-select:none;
+    font-size:clamp(22px,7vw,36px); cursor:pointer; user-select:none; -webkit-user-select:none;
     transition:box-shadow .15s ease;
   }
   .tm-tile.hidden{ box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
   .tm-tile.revealed{ box-shadow: inset 0 0 0 3px var(--accent); }
   .tm-tile.matched{ box-shadow: inset 0 0 0 3px #3EA35A; cursor:default; }
+  .tm-tile.flash::after{
+    content:""; position:absolute; inset:0;
+    background:rgba(62,163,90,0.6);
+    animation: tmFlashFade 0.65s ease-out forwards;
+    pointer-events:none;
+  }
+  @keyframes tmFlashFade{ from{ opacity:1; } to{ opacity:0; } }
   #tmNewGameBtn{ max-width:380px; margin-left:auto; margin-right:auto; display:block; }
   .road-choice-row{ display:flex; flex-direction:column; gap:8px; width:220px; }
   .road-choice-btn{ border:none; padding:13px; border-radius:11px; font-weight:700; font-size:13.5px; cursor:pointer; }
@@ -529,6 +539,11 @@
     <div class="tm-message" id="tmMessage">&nbsp;</div>
 
     <div class="tm-wrap" id="tmWrap">
+      <div class="tm-picker" id="tmPicker" style="display:none;">
+        <div class="road-overlay-title" style="color:var(--ink);">Tile Match</div>
+        <div class="road-overlay-sub" style="color:var(--ink-soft);">Choose a difficulty to begin.</div>
+        <div id="tmPickerButtons"></div>
+      </div>
       <div class="tm-grid" id="tmGrid"></div>
       <div class="road-overlay" id="tmOverlay" style="display:none;">
         <div class="road-overlay-card">
@@ -3245,13 +3260,13 @@
 
   function showTmDifficultyPicker(){
     stopTileMatch();
+    document.getElementById("tmOverlay").style.display = "none"; // hide the (unrelated) game-over overlay if it was showing
+    document.getElementById("tmGrid").style.display = "none";
     document.getElementById("tmGrid").innerHTML = "";
     document.getElementById("tmTimer").textContent = "0:00";
     document.getElementById("tmPoints").textContent = "0";
     showTmMessage("");
 
-    document.getElementById("tmOverlayTitle").textContent = "Tile Match";
-    document.getElementById("tmOverlaySub").textContent = "Choose a difficulty to begin.";
     var row = document.createElement("div");
     row.className = "road-diff-row";
     TM_DIFFICULTIES.forEach(function(d){
@@ -3265,10 +3280,10 @@
       });
       row.appendChild(btn);
     });
-    var btnsEl = document.getElementById("tmOverlayButtons");
+    var btnsEl = document.getElementById("tmPickerButtons");
     btnsEl.innerHTML = "";
     btnsEl.appendChild(row);
-    document.getElementById("tmOverlay").style.display = "flex";
+    document.getElementById("tmPicker").style.display = "block";
   }
 
   function startTileMatchGame(difficultyId){
@@ -3287,6 +3302,8 @@
     tm.startTimestamp = Date.now();
     tm.elapsedMs = 0;
 
+    document.getElementById("tmPicker").style.display = "none";
+    document.getElementById("tmGrid").style.display = "grid";
     document.getElementById("tmGrid").style.gridTemplateColumns = "repeat(" + cfg.cols + ",1fr)";
     document.getElementById("tmOverlay").style.display = "none";
     showTmMessage("");
@@ -3372,6 +3389,12 @@
       tm.locked = false;
 
       if (isMatch){
+        var gridEl = document.getElementById("tmGrid");
+        [fIdx, sIdx].forEach(function(idx){
+          var el = gridEl.children[idx];
+          el.classList.add("flash");
+          setTimeout(function(){ el.classList.remove("flash"); }, 700);
+        });
         tm.matchesFound++;
         if (tm.matchesFound === tm.pairs) finishTileMatch();
       }
